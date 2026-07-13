@@ -12,7 +12,7 @@ export interface ListCfg {
 
 export type ThemeMode = 'auto' | 'light' | 'dark' | 'sun'
 
-export type TileId = 'calendar' | 'photo' | 'tasks' | 'weather' | 'meals' | 'rewards'
+export type TileId = 'calendar' | 'calendarFull' | 'photo' | 'tasks' | 'weather' | 'meals' | 'rewards'
 
 export interface DashboardTile {
   id: TileId

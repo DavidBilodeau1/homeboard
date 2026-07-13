@@ -9,13 +9,11 @@ import { RewardsCard } from '../components/RewardsCard'
 import type { Page } from '../components/Sidebar'
 import { useStore } from '../store'
 import type { DashboardTile, TileId } from '../types'
-import { DEFAULT_TILES, GRID_COLS, GRID_MARGIN, GRID_ROWS, TILE_META, resolveLayout } from '../dashboardLayout'
+import { DEFAULT_SIZE, GRID_MARGIN, GRID_ROWS, TILE_META, resolveLayout } from '../dashboardLayout'
+import { CalendarFullCard } from '../components/CalendarFullCard'
 import { EditIcon, PlusIcon, TrashIcon } from '../icons'
 
 const RGL = WidthProvider(GridLayout)
-
-const DEFAULT_SIZE: Record<TileId, { w: number; h: number }> =
-  Object.fromEntries(DEFAULT_TILES.map((t) => [t.id, { w: t.w, h: t.h }])) as Record<TileId, { w: number; h: number }>
 
 export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const { config, reloadConfig, t } = useStore()
@@ -31,9 +29,17 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const [rowHeight, setRowHeight] = useState(90)
+  const [narrow, setNarrow] = useState(() => window.innerWidth < 640)
 
   useEffect(() => {
     fetch('/api/meta').then((r) => r.json()).then((m) => setEditorEnabled(!!m.editorEnabled)).catch(() => {})
+  }, [])
+
+  // phones get a simple scrolling stack instead of the drag-grid
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 640)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   // keep local tiles in sync with config whenever we're not mid-edit
@@ -56,6 +62,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const renderTile = (id: TileId): React.ReactNode => {
     switch (id) {
       case 'calendar': return <CalendarCard />
+      case 'calendarFull': return <CalendarFullCard />
       case 'photo': return <PhotoCard />
       case 'tasks': return <TasksCard />
       case 'weather': return <WeatherCard />
@@ -97,6 +104,20 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
     } finally {
       setSaving(false)
     }
+  }
+
+  // phones: a single scrolling column, tallest-first-intent preserved via each
+  // tile's configured height. No drag/resize here (that's for large screens).
+  if (narrow) {
+    return (
+      <div className="dash-stack">
+        {tiles.map((tile) => (
+          <div key={tile.id} className="dash-stack-tile" style={{ height: tile.h * 54 }}>
+            {renderTile(tile.id)}
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
