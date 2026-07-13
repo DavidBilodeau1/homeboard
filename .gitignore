@@ -12,6 +12,9 @@ config/.hb_session_secret
 config/config.json
 config/*.bak
 
+# private deploy config (SWAG conf, server-specific notes)
+deploy/
+
 # user photos (served from Immich or mounted at runtime)
 photos/*
 !photos/.gitkeep
