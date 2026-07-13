@@ -665,6 +665,8 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
 /* plan objects */
 .fp-house { fill: var(--fp-house); stroke: var(--ink); stroke-width: 4; pointer-events: none; }
+.fp-house.editable { pointer-events: auto; cursor: pointer; }
+.fp-house.selected { stroke: var(--accent); }
 .fp-gridline { fill: none; stroke: var(--fp-grid); stroke-width: 1; }
 .fp-obj { cursor: pointer; outline: none; }
 .fp-obj.editable { cursor: move; }
@@ -685,6 +687,22 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .fp-dl dt { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 .fp-dl dd { font-size: 0.875rem; font-weight: 800; text-align: right; }
 .fp-detail-hint { margin-top: 14px; font-size: 0.75rem; font-weight: 600; color: var(--muted); line-height: 1.5; }
+/* dimension editor */
+.fp-dims { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+.fp-dim { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fp-dim-label { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.fp-dim-inputs { display: flex; align-items: center; gap: 3px; }
+.fp-dim-inputs input {
+  width: 46px; font: inherit; font-size: 0.8125rem; font-weight: 800; text-align: center;
+  color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 5px 4px; outline: none;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.fp-dim-inputs input::-webkit-outer-spin-button,
+.fp-dim-inputs input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.fp-dim-inputs input:focus { border-color: var(--accent); }
+.fp-dim-inputs em { color: var(--muted); font-style: normal; font-weight: 700; font-size: 0.75rem; }
+
 .fp-rotate, .fp-remove, .fp-act { margin-top: 14px; width: 100%; background: var(--bg); justify-content: center; }
 .fp-remove { color: var(--accent); }
 .fp-act.armed { background: var(--accent); color: #fff; }

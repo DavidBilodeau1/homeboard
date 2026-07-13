@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { haGet } from '../api'
 import {
-  resolvePlan, CANVAS, GRID, SNAP, baseSize, feet, fmtFtIn,
-  type FloorId, type Room, type Exterior,
+  resolvePlan, DEFAULT_PLAN, CANVAS, GRID, SNAP, baseSize, feet, fmtFtIn,
+  type FloorId, type Room, type Exterior, type FtIn,
 } from '../floorplan'
 import {
   deviceKind, domainOf, isOn, needsConfirm, tapService, deviceValue,
@@ -14,7 +14,7 @@ import {
   GaugeIcon, DropletIcon, MotionIcon, BoltIcon, CoverIcon, DoorIcon, DotIcon,
   PlusIcon, TrashIcon,
 } from '../icons'
-import type { EntityState } from '../types'
+import type { EntityState, FloorPlanCfg } from '../types'
 
 const LS_KEY = 'homeboard-floorplan-layout'
 const DEV_KEY = 'homeboard-floorplan-devices'
@@ -83,7 +83,30 @@ interface PlanObj {
   areaSqFt: number
   note?: string
   rotatable: boolean
+  w: FtIn
+  h: FtIn
   rect: { x: number; y: number; w: number; h: number }
+}
+
+const asInt = (s: string) => { const n = parseInt(s, 10); return Number.isFinite(n) && n > 0 ? n : 0 }
+
+/** A feet-inches input pair (feet ′ / inches ″). */
+function DimField({ label, value, onChange, onCommit }: {
+  label: string; value: FtIn; onChange: (v: FtIn) => void; onCommit: () => void
+}) {
+  return (
+    <div className="fp-dim">
+      <span className="fp-dim-label">{label}</span>
+      <span className="fp-dim-inputs">
+        <input type="number" min={0} value={value[0]} aria-label={`${label} feet`}
+          onChange={(e) => onChange([asInt(e.target.value), value[1]])} onBlur={onCommit} />
+        <em>′</em>
+        <input type="number" min={0} max={11} value={value[1]} aria-label={`${label} inches`}
+          onChange={(e) => onChange([value[0], Math.min(11, asInt(e.target.value))])} onBlur={onCommit} />
+        <em>″</em>
+      </span>
+    </div>
+  )
 }
 
 export function FloorPlanPage() {
@@ -96,6 +119,8 @@ export function FloorPlanPage() {
   const [layout, setLayout] = useState<Layout>({})
   const [devices, setDevices] = useState<FloorDevice[]>([])
   const [armed, setArmed] = useState<string | null>(null)
+  // in-progress dimension edit for the selected object/house (live, commits to config on blur)
+  const [dimEdit, setDimEdit] = useState<{ id: string; w: FtIn; h: FtIn } | null>(null)
   const [picking, setPicking] = useState(false)
   const [options, setOptions] = useState<{ id: string; name: string }[] | null>(null)
   const [query, setQuery] = useState('')
@@ -134,6 +159,8 @@ export function FloorPlanPage() {
   // keep the floor plan's entities live (states + websocket) via the store
   useEffect(() => { trackEntities(devices.map((d) => d.entity)) }, [devices, trackEntities])
   useEffect(() => () => clearTimeout(armTimer.current), [])
+  // drop any in-progress dimension edit when the selection changes
+  useEffect(() => { setDimEdit(null) }, [selectedId])
 
   // persist current placements back to config.json
   const persist = (nextLayout: Layout, nextDevices: FloorDevice[]) => {
@@ -145,13 +172,16 @@ export function FloorPlanPage() {
 
   const objects: PlanObj[] = useMemo(() => {
     const build = (o: Room | Exterior, kind: PlanObj['kind'], shape: PlanObj['shape'], name: string, rotatable: boolean): PlanObj => {
-      const base = baseSize(o)
+      // an in-progress dimension edit for this object wins, for live resizing
+      const w0 = dimEdit?.id === o.id ? dimEdit.w : o.w
+      const h0 = dimEdit?.id === o.id ? dimEdit.h : o.h
+      const base = baseSize({ w: w0, h: h0 })
       const p = layout[o.id]
       const rot = !!p?.rot
       return {
-        id: o.id, kind, shape, name, rotatable,
-        dims: shape === 'circle' ? `Ø ${fmtFtIn(o.w)}` : `${fmtFtIn(o.w)} × ${fmtFtIn(o.h)}`,
-        areaSqFt: shape === 'circle' ? Math.round(Math.PI * (feet(o.w) / 2) ** 2) : Math.round(feet(o.w) * feet(o.h)),
+        id: o.id, kind, shape, name, rotatable, w: w0, h: h0,
+        dims: shape === 'circle' ? `Ø ${fmtFtIn(w0)}` : `${fmtFtIn(w0)} × ${fmtFtIn(h0)}`,
+        areaSqFt: shape === 'circle' ? Math.round(Math.PI * (feet(w0) / 2) ** 2) : Math.round(feet(w0) * feet(h0)),
         note: 'note' in o ? o.note : undefined,
         rect: { x: p?.x ?? o.x, y: p?.y ?? o.y, w: rot ? base.h : base.w, h: rot ? base.w : base.h },
       }
@@ -159,7 +189,16 @@ export function FloorPlanPage() {
     const rooms = floor.rooms.map((r) => build(r, 'room', 'rect', roomName(r), true))
     const ext = floor.id === groundId ? plan.exterior.map((e) => build(e, 'exterior', e.shape, exteriorName(e), e.shape === 'rect')) : []
     return [...ext, ...rooms]
-  }, [floor, plan, groundId, layout, t]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [floor, plan, groundId, layout, dimEdit, t]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // house rect, resized live while its dimensions are being edited
+  const houseRect = useMemo(() => {
+    if (dimEdit?.id === 'house') {
+      const s = baseSize({ w: dimEdit.w, h: dimEdit.h })
+      return { ...plan.house, w: s.w, h: s.h }
+    }
+    return plan.house
+  }, [plan.house, dimEdit])
 
   const floorDevices = devices.filter((d) => d.floor === floor.id)
   const selectedObj = objects.find((o) => o.id === selectedId) ?? null
@@ -196,7 +235,7 @@ export function FloorPlanPage() {
     const obj = objects.find((o) => o.id === d.id)!
     const { w, h } = obj.rect
     const rooms = objects.filter((o) => o.id !== d.id && o.kind === 'room')
-    const { house } = plan
+    const house = houseRect
     const vLines = [house.x, house.x + house.w, ...rooms.flatMap((o) => [o.rect.x, o.rect.x + o.rect.w])]
     const hLines = [house.y, house.y + house.h, ...rooms.flatMap((o) => [o.rect.y, o.rect.y + o.rect.h])]
     const nx = clamp(0, CANVAS.w - w, snapAxis(d.ox + dx, w, vLines))
@@ -265,6 +304,58 @@ export function FloorPlanPage() {
   const removeDevice = (id: string) => { saveDevices(devices.filter((d) => d.id !== id)); setSelectedId(null) }
   const reset = () => { saveLayout({}); setSelectedId(null) }
 
+  // ----- dimension editing (rooms / exterior / house) -----
+  const dimsOf = (id: string): { w: FtIn; h: FtIn; shape: 'rect' | 'circle' } | null => {
+    if (id === 'house') {
+      const hc = config?.floorPlan?.house ?? DEFAULT_PLAN.house!
+      return { w: hc.w, h: hc.h, shape: 'rect' }
+    }
+    const o = objects.find((x) => x.id === id)
+    return o ? { w: o.w, h: o.h, shape: o.shape } : null
+  }
+
+  // write the edited dimensions back to config.json (source of truth)
+  const commitDims = () => {
+    if (!dimEdit || !config) return
+    const src = config.floorPlan?.floors ? config.floorPlan : DEFAULT_PLAN
+    const fp: FloorPlanCfg = JSON.parse(JSON.stringify(src))
+    fp.layout = config.floorPlan?.layout ?? fp.layout
+    fp.devices = config.floorPlan?.devices ?? fp.devices
+    const { id, w, h } = dimEdit
+    if (id === 'house') {
+      fp.house = { ...(fp.house ?? { w, h }), w, h }
+    } else {
+      let done = false
+      for (const fl of fp.floors ?? []) {
+        const r = fl.rooms.find((room) => room.id === id)
+        if (r) { r.w = w; r.h = h; done = true; break }
+      }
+      if (!done) { const e = (fp.exterior ?? []).find((x) => x.id === id); if (e) { e.w = w; e.h = h } }
+    }
+    saveConfig({ ...config, floorPlan: fp })
+  }
+
+  const dimEditor = (id: string) => {
+    const base = dimsOf(id)
+    if (!base) return null
+    const cur = dimEdit?.id === id ? dimEdit : { id, w: base.w, h: base.h }
+    return (
+      <div className="fp-dims">
+        {base.shape === 'circle' ? (
+          <DimField label={t('floorplan.diameter')} value={cur.w}
+            onChange={(v) => setDimEdit({ id, w: v, h: v })} onCommit={commitDims} />
+        ) : (
+          <>
+            <DimField label={t('floorplan.width')} value={cur.w}
+              onChange={(w) => setDimEdit({ id, w, h: cur.h })} onCommit={commitDims} />
+            <DimField label={t('floorplan.height')} value={cur.h}
+              onChange={(h) => setDimEdit({ id, w: cur.w, h })} onCommit={commitDims} />
+          </>
+        )}
+      </div>
+    )
+  }
+
   const filteredOptions = (options ?? []).filter((o) => {
     const q = query.trim().toLowerCase()
     return !q || o.name.toLowerCase().includes(q) || o.id.toLowerCase().includes(q)
@@ -319,11 +410,14 @@ export function FloorPlanPage() {
                     <path d={`M ${GRID * 2} 0 L 0 0 0 ${GRID * 2}`} className="fp-gridline" />
                   </pattern>
                 </defs>
-                <rect x={0} y={0} width={CANVAS.w} height={CANVAS.h} fill="url(#fp-grid)" />
+                <rect x={0} y={0} width={CANVAS.w} height={CANVAS.h} fill="url(#fp-grid)" style={{ pointerEvents: 'none' }} />
               </>
             )}
 
-            <rect className="fp-house" x={plan.house.x} y={plan.house.y} width={plan.house.w} height={plan.house.h} rx={4} />
+            <rect
+              className={`fp-house${edit ? ' editable' : ''}${selectedId === 'house' ? ' selected' : ''}`}
+              x={houseRect.x} y={houseRect.y} width={houseRect.w} height={houseRect.h} rx={4}
+              onClick={() => { if (edit) setSelectedId('house') }} />
 
             {objects.map((o) => {
               const cx = o.rect.x + o.rect.w / 2
@@ -399,11 +493,22 @@ export function FloorPlanPage() {
                 <p className="fp-detail-hint">{t('floorplan.viewOnly')}</p>
               )}
             </div>
+          ) : selectedId === 'house' ? (
+            <div className="card fp-detail">
+              <h2 className="card-title">{t('floorplan.house')}</h2>
+              {edit
+                ? dimEditor('house')
+                : <dl className="fp-dl"><div><dt>{t('floorplan.dimensions')}</dt><dd>{fmtFtIn(dimsOf('house')!.w)} × {fmtFtIn(dimsOf('house')!.h)}</dd></div></dl>}
+            </div>
           ) : selectedObj ? (
             <div className="card fp-detail">
               <h2 className="card-title">{selectedObj.name}</h2>
+              {edit ? dimEditor(selectedObj.id) : (
+                <dl className="fp-dl">
+                  <div><dt>{t('floorplan.dimensions')}</dt><dd>{selectedObj.dims}</dd></div>
+                </dl>
+              )}
               <dl className="fp-dl">
-                <div><dt>{t('floorplan.dimensions')}</dt><dd>{selectedObj.dims}</dd></div>
                 <div><dt>{t('floorplan.area')}</dt><dd>{t('floorplan.sqft', { n: selectedObj.areaSqFt })}</dd></div>
                 {selectedObj.note && <div><dt>{t('floorplan.features')}</dt><dd>{t(`note.${selectedObj.note}`)}</dd></div>}
               </dl>
