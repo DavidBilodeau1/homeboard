@@ -2,14 +2,15 @@ import React from 'react'
 import { useStore } from '../store'
 import {
   DashboardIcon, HomeIcon, CalendarIcon, TasksIcon, StarIcon,
-  ListsIcon, MealsIcon, PhotosIcon, SettingsIcon,
+  ListsIcon, MealsIcon, PhotosIcon, SettingsIcon, FloorPlanIcon,
 } from '../icons'
 
-export type Page = 'dashboard' | 'home' | 'calendar' | 'tasks' | 'rewards' | 'lists' | 'meals' | 'photos' | 'settings'
+export type Page = 'dashboard' | 'home' | 'floorplan' | 'calendar' | 'tasks' | 'rewards' | 'lists' | 'meals' | 'photos' | 'settings'
 
 const ITEMS: { id: Page; icon: React.ReactNode }[] = [
   { id: 'dashboard', icon: <DashboardIcon /> },
   { id: 'home', icon: <HomeIcon /> },
+  { id: 'floorplan', icon: <FloorPlanIcon /> },
   { id: 'calendar', icon: <CalendarIcon /> },
   { id: 'tasks', icon: <TasksIcon /> },
   { id: 'rewards', icon: <StarIcon /> },

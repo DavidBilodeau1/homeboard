@@ -36,7 +36,9 @@ interface Store {
   adjustReward: (entity: string, dir: 'increment' | 'decrement') => Promise<void>
   entityStates: Record<string, EntityState | null>
   callService: (domain: string, service: string, data: Record<string, unknown>) => Promise<void>
+  trackEntities: (ids: string[]) => void
   reloadConfig: () => Promise<void>
+  saveConfig: (next: AppConfig) => Promise<boolean>
   persons: PersonState[]
   garbage: GarbageCollection[]
 }
@@ -104,6 +106,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   )
   const [osDark, setOsDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
   const [sunBelow, setSunBelow] = useState(false)
+  // entities registered by pages (e.g. floor plan) to keep live in addition to config
+  const extraRef = useRef<string[]>([])
 
   const locale = config?.locale || navigator.language
   const language = resolveLanguage(config?.language, locale)
@@ -144,10 +148,20 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const refreshEntities = useCallback(async (cfg: AppConfig) => {
-    const ids = smartHomeEntities(cfg)
+    const ids = [...new Set([...smartHomeEntities(cfg), ...extraRef.current])]
     if (!ids.length) return
     const results = await Promise.all(ids.map((id) => api.getState(id)))
-    setEntityStates(Object.fromEntries(ids.map((id, i) => [id, results[i]])))
+    setEntityStates((prev) => ({ ...prev, ...Object.fromEntries(ids.map((id, i) => [id, results[i]])) }))
+  }, [])
+
+  // let a page keep an arbitrary set of entities live (states + websocket updates)
+  const trackEntities = useCallback((ids: string[]) => {
+    const unique = [...new Set(ids.filter(Boolean))]
+    extraRef.current = unique
+    if (!unique.length) return
+    Promise.all(unique.map((id) => api.getState(id))).then((results) =>
+      setEntityStates((prev) => ({ ...prev, ...Object.fromEntries(unique.map((id, i) => [id, results[i]])) })),
+    )
   }, [])
 
   const refreshSun = useCallback(async () => {
@@ -299,7 +313,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           else if (id === 'sun.sun') debounced('sun', refreshSun)
           else if (id.startsWith('person.')) debounced('persons', refreshPersons)
           else if (garbageEntities(cfg).includes(id)) debounced('garbage', () => refreshGarbage(cfg))
-          else if (smartHomeEntities(cfg).includes(id)) debounced('ent', () => refreshEntities(cfg))
+          else if (smartHomeEntities(cfg).includes(id) || extraRef.current.includes(id))
+            debounced('ent', () => refreshEntities(cfg))
         } catch { /* ignore malformed frames */ }
       }
       ws.onclose = () => {
@@ -346,6 +361,18 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setConfig(cfg)
   }, [])
 
+  // write the full config back to the server; optimistic, reverts on failure
+  const saveConfig = useCallback(async (next: AppConfig): Promise<boolean> => {
+    setConfig(next)
+    try {
+      await api.saveConfig(next)
+      return true
+    } catch {
+      await reloadConfig()
+      return false
+    }
+  }, [reloadConfig])
+
   const callService = useCallback(async (domain: string, service: string, data: Record<string, unknown>) => {
     // optimistic flip for light toggles so tiles feel instant
     const target = typeof data.entity_id === 'string' ? data.entity_id : undefined
@@ -380,10 +407,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
     monthCursor, setMonthCursor, selectedDate, setSelectedDate,
-    toggleItem, addItem, removeItem, adjustReward, entityStates, callService, reloadConfig, persons, garbage,
+    toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage,
   }), [config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
-    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, reloadConfig, persons, garbage])
+    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

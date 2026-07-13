@@ -69,6 +69,63 @@ export interface GarbageCollection {
   daysUntil: number | null // 0 = today, 1 = tomorrow, …
 }
 
+/** A [feet, inches] measurement, e.g. [10, 6] = 10′6″. */
+export type FeetInches = [number, number]
+
+export interface FloorPlanRoomCfg {
+  id: string
+  /** i18n key under `room.` (living, kitchen, bedroom, …); translated for display */
+  type?: string
+  /** explicit label; overrides the translated `type` */
+  name?: string
+  /** disambiguating suffix, e.g. "1" */
+  tag?: string
+  /** i18n key under `note.` for a feature line (dishwasherIsland, showerSink, …) */
+  note?: string
+  w: FeetInches
+  h: FeetInches
+  /** default position on the plan (plan units); optional, dragging overrides it */
+  x?: number
+  y?: number
+}
+
+export interface FloorPlanFloorCfg {
+  id: string
+  /** label; falls back to the `floorplan.<id>` translation */
+  name?: string
+  rooms: FloorPlanRoomCfg[]
+}
+
+export interface FloorPlanExteriorCfg {
+  id: string
+  shape: 'circle' | 'rect'
+  /** i18n key under `floorplan.` (pool, shed); translated for display */
+  type?: string
+  name?: string
+  w: FeetInches
+  h: FeetInches
+  x?: number
+  y?: number
+}
+
+/** A room/feature's placement override once dragged (plan units). */
+export interface FloorPlanPlacement { x: number; y: number; rot?: boolean }
+
+/** A Home Assistant entity dropped on the plan. x/y is the marker centre. */
+export interface FloorDevice { id: string; entity: string; floor: string; x: number; y: number }
+
+export interface FloorPlanCfg {
+  /** exterior footprint, to scale (from the certificate of location) */
+  house?: { w: FeetInches; h: FeetInches; x?: number; y?: number }
+  floors?: FloorPlanFloorCfg[]
+  /** site features shown around the ground floor (pool, shed) */
+  exterior?: FloorPlanExteriorCfg[]
+  /** per-room/feature drag positions & rotation, keyed by id */
+  layout?: Record<string, FloorPlanPlacement>
+  /** placed devices (shared across all screens) */
+  devices?: FloorDevice[]
+}
+
 export interface AppConfig {
   locale?: string
   language?: string
@@ -84,6 +141,7 @@ export interface AppConfig {
   smartHome?: SmartHomeCfg
   dashboard?: DashboardLayout
   garbage?: GarbageCfg[]
+  floorPlan?: FloorPlanCfg
 }
 
 export interface TodoItem {

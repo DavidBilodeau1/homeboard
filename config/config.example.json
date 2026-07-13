@@ -61,5 +61,32 @@
     { "name": "Trash", "entity": "sensor.trash_schedule", "color": "#3d9b63" },
     { "name": "Recycle", "entity": "sensor.recycle_schedule", "color": "#4a7dd6" },
     { "name": "Compost", "entity": "sensor.compost_schedule", "color": "#8a5a3b" }
-  ]
+  ],
+  "floorPlan": {
+    "house": { "w": [37, 6], "h": [24, 9] },
+    "floors": [
+      {
+        "id": "rdc",
+        "name": "Ground floor",
+        "rooms": [
+          { "id": "living", "type": "living", "w": [11, 6], "h": [14, 11], "x": 40, "y": 210 },
+          { "id": "kitchen", "type": "kitchen", "note": "dishwasherIsland", "w": [10, 10], "h": [8, 2], "x": 40, "y": 360 },
+          { "id": "bed1", "type": "bedroom", "tag": "1", "w": [9, 5], "h": [12, 1], "x": 155, "y": 210 },
+          { "id": "bath", "type": "bathroom", "w": [9, 4], "h": [4, 11], "x": 327, "y": 360 }
+        ]
+      },
+      {
+        "id": "ss1",
+        "name": "Basement",
+        "rooms": [
+          { "id": "family", "type": "familyRoom", "w": [10, 10], "h": [19, 9], "x": 40, "y": 210 },
+          { "id": "laundry", "type": "laundry", "note": "showerSink", "w": [14, 5], "h": [7, 3], "x": 252, "y": 320 }
+        ]
+      }
+    ],
+    "exterior": [
+      { "id": "pool", "shape": "circle", "type": "pool", "w": [15, 0], "h": [15, 0], "x": 40, "y": 30 },
+      { "id": "shed", "shape": "rect", "type": "shed", "w": [12, 4], "h": [14, 4], "x": 430, "y": 30 }
+    ]
+  }
 }

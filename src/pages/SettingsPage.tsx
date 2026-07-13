@@ -99,7 +99,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="ed-field"><span>{label}</span>{children}</label>
 }
 
-const TABS = ['general', 'calendars', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'json'] as const
+const TABS = ['general', 'calendars', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'garbage', 'json'] as const
 type Tab = (typeof TABS)[number]
 
 export function SettingsPage() {
@@ -118,7 +118,7 @@ export function SettingsPage() {
   const tabLabel: Record<Tab, string> = useMemo(() => ({
     general: t('settings.general'), calendars: t('nav.calendar'), tasks: t('nav.tasks'),
     meals: t('nav.meals'), lists: t('nav.lists'), rewards: t('nav.rewards'),
-    smarthome: t('nav.home'), json: t('settings.json'),
+    smarthome: t('nav.home'), garbage: t('settings.garbage'), json: t('settings.json'),
   }), [t])
 
   if (!draft) return <div className="card page-card settings-page"><h2 className="card-title">{t('settings.title')}</h2></div>
@@ -276,6 +276,14 @@ export function SettingsPage() {
                 <h3 className="ed-subtitle">{t('home.security')}</h3>
                 <ListEditor rows={(sh.locks ?? []) as Row[]} domains={['lock']} options={options} t={t}
                   onChange={(rows) => upSh((s) => { s.locks = rows.filter((r) => r.entity) as NamedEntity[] })} />
+              </div>
+            )}
+
+            {tab === 'garbage' && (
+              <div className="ed-fields">
+                <p className="settings-note" style={{ margin: 0 }}>{t('settings.garbageHint')}</p>
+                <ListEditor rows={(draft.garbage ?? []) as Row[]} domains={['sensor']} options={options} withColor t={t}
+                  onChange={(rows) => up((d) => { d.garbage = rows.filter((r) => r.entity).map((r) => ({ name: r.name, entity: r.entity as string, color: r.color ?? '#3d9b63' })) })} />
               </div>
             )}
 

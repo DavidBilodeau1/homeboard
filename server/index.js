@@ -189,6 +189,9 @@ function validateConfig(c) {
       if (!isNamedRows(sh[k])) return `smartHome.${k} must be an array of { name, entity }`
     }
   }
+  if (c.garbage !== undefined && !isNamedRows(c.garbage)) {
+    return 'garbage must be an array of { name, entity, color }'
+  }
   if (c.dashboard !== undefined) {
     const d = c.dashboard
     if (!d || typeof d !== 'object' || Array.isArray(d)) return 'dashboard must be an object'

@@ -7,6 +7,13 @@ const json = async (r: Response) => {
 
 export const getConfig = () => fetch('/api/config').then(json)
 
+export const saveConfig = (cfg: unknown) =>
+  fetch('/api/config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cfg),
+  }).then(json)
+
 export const haGet = (path: string) => fetch(`/api/ha/${path}`).then(json)
 
 export const haPost = (path: string, body: unknown) =>

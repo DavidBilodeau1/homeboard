@@ -11,8 +11,9 @@ import { RewardsPage } from './pages/RewardsPage'
 import { PhotosPage } from './pages/PhotosPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { SmartHomePage } from './pages/SmartHomePage'
+import { FloorPlanPage } from './pages/FloorPlanPage'
 
-const PAGES: Page[] = ['dashboard', 'home', 'calendar', 'tasks', 'rewards', 'lists', 'meals', 'photos', 'settings']
+const PAGES: Page[] = ['dashboard', 'home', 'floorplan', 'calendar', 'tasks', 'rewards', 'lists', 'meals', 'photos', 'settings']
 
 const pageFromHash = (): Page => {
   const h = location.hash.replace(/^#\/?/, '') as Page
@@ -44,6 +45,7 @@ function Shell() {
         <div className="content">
           {page === 'dashboard' && <Dashboard onNavigate={navigate} />}
           {page === 'home' && <SmartHomePage />}
+          {page === 'floorplan' && <FloorPlanPage />}
           {page === 'calendar' && <CalendarPage />}
           {page === 'tasks' && <TodoBoardPage title={t('nav.tasks')} lists={config?.tasks ?? []} />}
           {page === 'rewards' && <RewardsPage />}

@@ -111,6 +111,13 @@ export const HomeIcon = () => (
   </I>
 )
 
+export const FloorPlanIcon = () => (
+  <I>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="1.5" />
+    <path d="M3.5 12h7M10.5 12V20.5M10.5 8h10M14.5 3.5V8" />
+  </I>
+)
+
 export const BulbIcon = ({ size = 22 }: { size?: number }) => (
   <I size={size}>
     <path d="M9 18h6M10 21h4" />
@@ -166,6 +173,67 @@ export const SunIcon = ({ size = 20 }: { size?: number }) => (
     <circle cx="12" cy="12" r="4" />
     <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" />
   </I>
+)
+
+export const PlugIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}>
+    <path d="M9 3v5M15 3v5" />
+    <path d="M6 8h12v3a6 6 0 0 1-12 0z" />
+    <path d="M12 17v4" />
+  </I>
+)
+
+export const FanIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}>
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    <path d="M12 10.4c0-4 .6-6.4 2.4-6.4 1.6 0 2.2 2 1 4.2-1 1.8-2.4 2.2-3.4 2.2" />
+    <path d="M13.6 12c4 0 6.4.6 6.4 2.4 0 1.6-2 2.2-4.2 1-1.8-1-2.2-2.4-2.2-3.4" />
+    <path d="M12 13.6c0 4-.6 6.4-2.4 6.4-1.6 0-2.2-2-1-4.2 1-1.8 2.4-2.2 3.4-2.2" />
+    <path d="M10.4 12c-4 0-6.4-.6-6.4-2.4 0-1.6 2-2.2 4.2-1 1.8 1 2.2 2.4 2.2 3.4" />
+  </I>
+)
+
+export const GaugeIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}>
+    <path d="M4 15a8 8 0 0 1 16 0" />
+    <path d="M12 15l4-3" />
+    <circle cx="12" cy="15" r="1.2" fill="currentColor" stroke="none" />
+  </I>
+)
+
+export const DropletIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}><path d="M12 3.5s5 5.6 5 9.2a5 5 0 0 1-10 0c0-3.6 5-9.2 5-9.2z" /></I>
+)
+
+export const MotionIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}>
+    <circle cx="13" cy="5.5" r="1.6" />
+    <path d="M6 21l3-5 2-3 1 3 3 2M11 13l-1-4 4 1 2 3" />
+  </I>
+)
+
+export const BoltIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}><path d="M13 3L5 13h6l-1 8 8-11h-6l1-7z" /></I>
+)
+
+export const CoverIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}>
+    <rect x="4.5" y="4" width="15" height="4" rx="1" />
+    <path d="M6 8v9M10 8v9M14 8v9M18 8v9" />
+    <path d="M4.5 17h15" />
+  </I>
+)
+
+export const DoorIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}>
+    <path d="M6 20V4h9a1 1 0 0 1 1 1v15" />
+    <path d="M4.5 20h15" />
+    <circle cx="13" cy="12" r="0.9" fill="currentColor" stroke="none" />
+  </I>
+)
+
+export const DotIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}><circle cx="12" cy="12" r="5" /></I>
 )
 
 export const ChevronDown = ({ size = 14 }: { size?: number }) => (
