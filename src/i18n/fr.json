@@ -50,6 +50,8 @@
   "meals.empty": "Vide",
   "status.home": "À la maison",
   "status.away": "Sorti",
+  "garbage.today": "aujourd'hui",
+  "garbage.tomorrow": "demain",
   "topbar.people": "Personnes",
   "topbar.connection": "Connexion",
   "login.subtitle": "Connectez-vous pour voir votre tableau de bord",

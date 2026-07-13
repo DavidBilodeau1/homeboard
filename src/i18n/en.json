@@ -50,6 +50,8 @@
   "meals.empty": "Empty",
   "status.home": "Home",
   "status.away": "Away",
+  "garbage.today": "today",
+  "garbage.tomorrow": "tomorrow",
   "topbar.people": "People",
   "topbar.connection": "Connection",
   "login.subtitle": "Sign in to view your dashboard",

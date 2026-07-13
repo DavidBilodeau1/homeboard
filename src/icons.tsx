@@ -87,6 +87,15 @@ export const WifiIcon = () => (
   </I>
 )
 
+export const BinIcon = ({ size = 18 }: { size?: number }) => (
+  <I size={size}>
+    <path d="M4 7h16" />
+    <path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+    <path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2" />
+    <path d="M10 11v6M14 11v6" />
+  </I>
+)
+
 export const EditIcon = ({ size = 22 }: { size?: number }) => (
   <I size={size}>
     <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" />

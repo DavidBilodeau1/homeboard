@@ -56,5 +56,10 @@
       { "id": "photo", "x": 6, "y": 4, "w": 4, "h": 5 },
       { "id": "rewards", "x": 10, "y": 4, "w": 2, "h": 5 }
     ]
-  }
+  },
+  "garbage": [
+    { "name": "Trash", "entity": "sensor.trash_schedule", "color": "#3d9b63" },
+    { "name": "Recycle", "entity": "sensor.recycle_schedule", "color": "#4a7dd6" },
+    { "name": "Compost", "entity": "sensor.compost_schedule", "color": "#8a5a3b" }
+  ]
 }

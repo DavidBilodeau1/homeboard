@@ -1,14 +1,14 @@
 import React, { useState } from 'react'
 import { useStore } from '../store'
 import { fmtTime, fmtTopDate } from '../util'
-import { WeatherIcon, WifiIcon, ChevronDown, MoonIcon, SunIcon, MenuIcon } from '../icons'
+import { WeatherIcon, WifiIcon, ChevronDown, MoonIcon, SunIcon, MenuIcon, BinIcon } from '../icons'
 
 const AVATAR_COLORS = ['#E58BA0', '#8BAAE5', '#8BD0A0', '#E5C08B', '#B79BE0']
 
 type Menu = 'people' | 'wifi' | null
 
 export function TopBar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
-  const { now, locale, t, weather, forecast, connected, config, systemInfo, persons, resolvedTheme, setThemeMode } = useStore()
+  const { now, locale, t, weather, forecast, connected, config, systemInfo, persons, garbage, resolvedTheme, setThemeMode } = useStore()
   const [menu, setMenu] = useState<Menu>(null)
 
   const today = forecast[0]
@@ -43,6 +43,14 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
           <span>{hi != null ? (lo != null ? `${hi}/${lo}${unit}` : `${hi}${unit}`) : '--'}</span>
         </span>
       )}
+      {garbage
+        .filter((g) => g.daysUntil === 0 || g.daysUntil === 1)
+        .map((g) => (
+          <span key={g.name} className="tb-garbage" style={{ background: g.color }}>
+            <BinIcon size={17} />
+            {g.name} · {g.daysUntil === 0 ? t('garbage.today') : t('garbage.tomorrow')}
+          </span>
+        ))}
       <div className="tb-right">
         <div className="tb-menu-wrap">
           <button className="tb-avatars" onClick={() => toggle('people')} aria-label={t('topbar.people')}>

@@ -56,6 +56,19 @@ export interface PersonState {
   state: string // 'home' | 'not_home' | zone name
 }
 
+export interface GarbageCfg {
+  name: string
+  entity: string // a `device_class: timestamp` sensor holding the next collection date
+  color: string
+}
+
+export interface GarbageCollection {
+  name: string
+  color: string
+  dayKey: string | null   // local calendar day of the next collection
+  daysUntil: number | null // 0 = today, 1 = tomorrow, …
+}
+
 export interface AppConfig {
   locale?: string
   language?: string
@@ -70,6 +83,7 @@ export interface AppConfig {
   photos?: { intervalSeconds?: number }
   smartHome?: SmartHomeCfg
   dashboard?: DashboardLayout
+  garbage?: GarbageCfg[]
 }
 
 export interface TodoItem {
@@ -88,6 +102,7 @@ export interface CalEvent {
   calendar: string
   color: string
   dayKeys: string[]
+  garbage?: boolean // synthetic garbage-collection event
 }
 
 export interface WeatherState {

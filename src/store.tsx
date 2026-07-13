@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import type { AppConfig, CalEvent, TodoItem, ForecastDay, WeatherState, ThemeMode, EntityState, PersonState } from './types'
+import type { AppConfig, CalEvent, TodoItem, ForecastDay, WeatherState, ThemeMode, EntityState, PersonState, GarbageCollection } from './types'
 import * as api from './api'
 import { addDays, dayKey, monthGrid, startOfMonth } from './util'
 import { makeT, resolveLanguage, type Translate } from './i18n'
@@ -38,7 +38,11 @@ interface Store {
   callService: (domain: string, service: string, data: Record<string, unknown>) => Promise<void>
   reloadConfig: () => Promise<void>
   persons: PersonState[]
+  garbage: GarbageCollection[]
 }
+
+const garbageEntities = (cfg: AppConfig | null): string[] =>
+  (cfg?.garbage ?? []).map((g) => g.entity).filter(Boolean)
 
 /** Every entity id referenced by the smartHome config section. */
 const smartHomeEntities = (cfg: AppConfig | null): string[] => {
@@ -83,7 +87,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [now, setNow] = useState(new Date())
   const [todos, setTodos] = useState<Record<string, TodoItem[]>>({})
-  const [events, setEvents] = useState<CalEvent[]>([])
+  const [calEvents, setCalEvents] = useState<CalEvent[]>([])
+  const [garbage, setGarbage] = useState<GarbageCollection[]>([])
   const [weather, setWeather] = useState<WeatherState | null>(null)
   const [forecast, setForecast] = useState<ForecastDay[]>([])
   const [rewardValues, setRewardValues] = useState<Record<string, number | null>>({})
@@ -123,7 +128,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const all = await Promise.all(
       cfg.calendars.map(async (c) => normalizeEvents(await api.getCalendarEvents(c.entity, start, end), c.entity, c.color)),
     )
-    setEvents(all.flat().sort((a, b) => a.start.localeCompare(b.start)))
+    setCalEvents(all.flat().sort((a, b) => a.start.localeCompare(b.start)))
   }, [])
 
   const refreshWeather = useCallback(async (cfg: AppConfig) => {
@@ -172,13 +177,33 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setRewardValues(map)
   }, [])
 
+  const refreshGarbage = useCallback(async (cfg: AppConfig) => {
+    const cfgs = cfg.garbage ?? []
+    if (!cfgs.length) { setGarbage([]); return }
+    const todayKey = dayKey(new Date())
+    const results = await Promise.all(
+      cfgs.map(async (g): Promise<GarbageCollection> => {
+        const st = await api.getState(g.entity)
+        const raw = st?.state
+        const date = raw && raw !== 'unknown' && raw !== 'unavailable' ? new Date(raw) : null
+        if (!date || isNaN(date.getTime())) return { name: g.name, color: g.color, dayKey: null, daysUntil: null }
+        const k = dayKey(date)
+        // whole-day difference between today and the collection's local day
+        const diff = Math.round((new Date(k + 'T00:00:00').getTime() - new Date(todayKey + 'T00:00:00').getTime()) / 86_400_000)
+        return { name: g.name, color: g.color, dayKey: k, daysUntil: diff }
+      }),
+    )
+    setGarbage(results)
+  }, [])
+
   const refreshAll = useCallback((cfg: AppConfig, cursor: Date) => {
     refreshTodos(cfg)
     refreshEvents(cfg, cursor)
     refreshWeather(cfg)
     refreshRewards(cfg)
     refreshEntities(cfg)
-  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshEntities])
+    refreshGarbage(cfg)
+  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshEntities, refreshGarbage])
 
   // keep latest refresh closure available to the websocket handler
   const refresher = useRef<{ cfg: AppConfig | null; cursor: Date }>({ cfg: null, cursor: monthCursor })
@@ -273,6 +298,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             debounced('rw', () => refreshRewards(cfg))
           else if (id === 'sun.sun') debounced('sun', refreshSun)
           else if (id.startsWith('person.')) debounced('persons', refreshPersons)
+          else if (garbageEntities(cfg).includes(id)) debounced('garbage', () => refreshGarbage(cfg))
           else if (smartHomeEntities(cfg).includes(id)) debounced('ent', () => refreshEntities(cfg))
         } catch { /* ignore malformed frames */ }
       }
@@ -287,7 +313,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       Object.values(timers).forEach(clearTimeout)
       ws?.close()
     }
-  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshSun, refreshEntities, refreshPersons])
+  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshSun, refreshEntities, refreshPersons, refreshGarbage])
 
   // ----- actions -----
   const toggleItem = useCallback(async (entity: string, item: TodoItem) => {
@@ -336,14 +362,28 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshEntities])
 
+  // garbage collections surface as colored all-day events in every calendar view
+  const garbageEvents = useMemo<CalEvent[]>(() =>
+    garbage.filter((g) => g.dayKey).map((g) => ({
+      summary: g.name,
+      start: `${g.dayKey}T00:00:00`,
+      end: `${g.dayKey}T00:00:00`,
+      allDay: true,
+      calendar: 'garbage',
+      color: g.color,
+      dayKeys: [g.dayKey!],
+      garbage: true,
+    })), [garbage])
+  const events = useMemo(() => [...calEvents, ...garbageEvents], [calEvents, garbageEvents])
+
   const value = useMemo<Store>(() => ({
     config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
     monthCursor, setMonthCursor, selectedDate, setSelectedDate,
-    toggleItem, addItem, removeItem, adjustReward, entityStates, callService, reloadConfig, persons,
+    toggleItem, addItem, removeItem, adjustReward, entityStates, callService, reloadConfig, persons, garbage,
   }), [config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
-    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, reloadConfig, persons])
+    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, reloadConfig, persons, garbage])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

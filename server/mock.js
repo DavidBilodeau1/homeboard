@@ -112,6 +112,10 @@ const states = () => ({
   },
   'person.david': { entity_id: 'person.david', state: 'home', attributes: { friendly_name: 'David' } },
   'person.amelie': { entity_id: 'person.amelie', state: 'not_home', attributes: { friendly_name: 'Amélie' } },
+  // garbage schedule sensors (device_class timestamp): recycle tomorrow, compost +3, trash +9
+  'sensor.saguenay_recuperation_schedule': { entity_id: 'sensor.saguenay_recuperation_schedule', state: iso(at(days(new Date(), 1), 0)), attributes: { device_class: 'timestamp', friendly_name: 'Récupération' } },
+  'sensor.saguenay_compostage_schedule': { entity_id: 'sensor.saguenay_compostage_schedule', state: iso(at(days(new Date(), 3), 0)), attributes: { device_class: 'timestamp', friendly_name: 'Compostage' } },
+  'sensor.saguenay_ordure_schedule': { entity_id: 'sensor.saguenay_ordure_schedule', state: iso(at(days(new Date(), 9), 0)), attributes: { device_class: 'timestamp', friendly_name: 'Ordure' } },
 })
 
 const counters = { 'counter.david_stars': 12, 'counter.amelie_stars': 8 }
