@@ -26,18 +26,29 @@ type Layout = Record<string, Placement>
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v))
 const snap = (v: number) => Math.round(v / GRID) * GRID
 
-/** Snap one axis: align the moving object's near/far edge to the closest wall
- *  or room edge within SNAP; otherwise fall back to the plain grid. */
-const snapAxis = (pos: number, size: number, lines: number[]): number => {
-  let best = pos
-  let bestDelta = SNAP + 1
+/** Straighten pulls a room's edge to a wall/neighbour up to this far (plan units). */
+const STRAIGHTEN_SNAP = 24
+
+/** Position that aligns the object's nearest edge (near or far) to the closest
+ *  line within `threshold`, or null when nothing is close enough. */
+const snapTo = (pos: number, size: number, lines: number[], threshold: number): number | null => {
+  let best: number | null = null
+  let bestDelta = threshold + 1
   for (const line of lines) {
     const dNear = Math.abs(pos - line)
     if (dNear < bestDelta) { bestDelta = dNear; best = line }
     const dFar = Math.abs(pos + size - line)
     if (dFar < bestDelta) { bestDelta = dFar; best = line - size }
   }
-  return bestDelta <= SNAP ? best : snap(pos)
+  return best
+}
+
+/** Drag snap: align to the closest wall/room edge within `threshold`, else fall
+ *  back to the grid (or leave unchanged when `gridFallback` is false). */
+const snapAxis = (pos: number, size: number, lines: number[], threshold = SNAP, gridFallback = true): number => {
+  const s = snapTo(pos, size, lines, threshold)
+  if (s !== null) return s
+  return gridFallback ? snap(pos) : pos
 }
 
 const loadJSON = <T,>(key: string, fallback: T): T => {
@@ -304,6 +315,29 @@ export function FloorPlanPage() {
   const removeDevice = (id: string) => { saveDevices(devices.filter((d) => d.id !== id)); setSelectedId(null) }
   const reset = () => { saveLayout({}); setSelectedId(null) }
 
+  // snap every room's nearest edge to a house wall (preferred) or, failing that,
+  // a neighbouring room edge — straightening the perimeter and shared borders
+  const straighten = () => {
+    const rooms = objects.filter((o) => o.kind === 'room')
+    const house = houseRect
+    const wallsV = [house.x, house.x + house.w]
+    const wallsH = [house.y, house.y + house.h]
+    const next: Layout = { ...layout }
+    for (const o of rooms) {
+      const others = rooms.filter((r) => r.id !== o.id)
+      const edgesV = others.flatMap((r) => [r.rect.x, r.rect.x + r.rect.w])
+      const edgesH = others.flatMap((r) => [r.rect.y, r.rect.y + r.rect.h])
+      const nx = snapTo(o.rect.x, o.rect.w, wallsV, STRAIGHTEN_SNAP) ?? snapTo(o.rect.x, o.rect.w, edgesV, STRAIGHTEN_SNAP) ?? o.rect.x
+      const ny = snapTo(o.rect.y, o.rect.h, wallsH, STRAIGHTEN_SNAP) ?? snapTo(o.rect.y, o.rect.h, edgesH, STRAIGHTEN_SNAP) ?? o.rect.y
+      next[o.id] = {
+        ...next[o.id],
+        x: clamp(0, CANVAS.w - o.rect.w, nx),
+        y: clamp(0, CANVAS.h - o.rect.h, ny),
+      }
+    }
+    saveLayout(next)
+  }
+
   // ----- dimension editing (rooms / exterior / house) -----
   const dimsOf = (id: string): { w: FtIn; h: FtIn; shape: 'rect' | 'circle' } | null => {
     if (id === 'house') {
@@ -382,6 +416,7 @@ export function FloorPlanPage() {
         </div>
         <div className="fp-actions">
           {edit && <button className="fp-btn" onClick={openPicker}><PlusIcon size={14} /> {t('floorplan.addDevice')}</button>}
+          {edit && <button className="fp-btn" onClick={straighten}>{t('floorplan.straighten')}</button>}
           {edit && <button className="fp-btn" onClick={reset}>{t('floorplan.reset')}</button>}
           <button className={`fp-btn${edit ? ' primary' : ''}`} onClick={() => setEdit((v) => !v)}>
             {edit ? t('floorplan.done') : t('floorplan.rearrange')}

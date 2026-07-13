@@ -140,6 +140,7 @@
   "floorplan.rearrange": "Rearrange",
   "floorplan.done": "Done",
   "floorplan.reset": "Reset",
+  "floorplan.straighten": "Straighten",
   "floorplan.rotate": "Rotate 90°",
   "floorplan.editHint": "Drag rooms to move them. Select a room or the house outline to edit its dimensions or rotate it. Everything is saved automatically.",
   "floorplan.house": "House",

@@ -140,6 +140,7 @@
   "floorplan.rearrange": "Réorganiser",
   "floorplan.done": "Terminé",
   "floorplan.reset": "Réinitialiser",
+  "floorplan.straighten": "Aligner",
   "floorplan.rotate": "Pivoter 90°",
   "floorplan.editHint": "Glissez les pièces pour les déplacer. Sélectionnez une pièce ou le contour de la maison pour modifier ses dimensions ou la pivoter. Tout est enregistré automatiquement.",
   "floorplan.house": "Maison",
