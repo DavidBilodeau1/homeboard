@@ -1,0 +1,29 @@
+services:
+  homeboard:
+    build: .
+    container_name: homeboard
+    ports:
+      - "8090:8090"
+    environment:
+      HA_URL: ${HA_URL:?set HA_URL in .env}
+      HA_TOKEN: ${HA_TOKEN:?set HA_TOKEN in .env}
+      IMMICH_URL: ${IMMICH_URL:-}
+      IMMICH_API_KEY: ${IMMICH_API_KEY:-}
+      IMMICH_ALBUM: ${IMMICH_ALBUM:-Wallpanel}
+      # Set to 0 to make the Settings config editor read-only (wall-panel mode)
+      EDITOR_ENABLED: ${EDITOR_ENABLED:-1}
+      # "Log in with Home Assistant": set PUBLIC_URL to HomeBoard's externally
+      # reachable base URL (e.g. https://homeboard.example.com) to REQUIRE login.
+      # Leave empty to keep the dashboard open (trusted LAN only).
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      # Optional: force auth off even when PUBLIC_URL is set (AUTH_ENABLED=0)
+      AUTH_ENABLED: ${AUTH_ENABLED:-}
+      # Optional: pin the session-signing secret (else auto-generated & persisted
+      # to ./config/.hb_session_secret so logins survive restarts)
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      # Uncomment if your HA uses a self-signed certificate:
+      # NODE_TLS_REJECT_UNAUTHORIZED: "0"
+    volumes:
+      - ./config:/app/config
+      - ./photos:/app/photos:ro
+    restart: unless-stopped

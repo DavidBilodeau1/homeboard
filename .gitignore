@@ -1,0 +1,23 @@
+# dependencies & build output
+node_modules/
+dist/
+
+# secrets & environment
+.env
+.env.*
+!.env.example
+config/.hb_session_secret
+
+# personal runtime config (copy config.example.json → config.json and edit)
+config/config.json
+config/*.bak
+
+# user photos (served from Immich or mounted at runtime)
+photos/*
+!photos/.gitkeep
+
+# editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.log

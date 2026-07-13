@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450">
+  <defs>
+    <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6c8a0"/>
+      <stop offset="0.55" stop-color="#f2e3c8"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fb6c9"/>
+      <stop offset="1" stop-color="#6d9ab0"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="270" fill="url(#dusk)"/>
+  <circle cx="400" cy="200" r="55" fill="#f2a45c"/>
+  <path d="M0 250 L180 140 L320 250 Z" fill="#b58a68" opacity="0.85"/>
+  <path d="M240 250 L420 110 L620 250 Z" fill="#9c7355"/>
+  <path d="M540 250 L700 165 L800 250 Z" fill="#b58a68" opacity="0.85"/>
+  <rect y="250" width="800" height="200" fill="url(#water)"/>
+  <g stroke="#f8dcae" stroke-width="4" opacity="0.75">
+    <line x1="350" y1="290" x2="450" y2="290"/>
+    <line x1="370" y1="320" x2="430" y2="320"/>
+    <line x1="385" y1="350" x2="415" y2="350"/>
+  </g>
+  <g fill="#3c4a52">
+    <path d="M120 300 q18 -22 36 0 z"/>
+    <path d="M660 330 q15 -18 30 0 z"/>
+  </g>
+</svg>

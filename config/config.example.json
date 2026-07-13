@@ -1,0 +1,60 @@
+{
+  "locale": "en-US",
+  "language": "en",
+  "theme": "auto",
+  "weatherEntity": "weather.home",
+  "calendars": [
+    { "entity": "calendar.family", "name": "Family", "color": "#C33C54" },
+    { "entity": "calendar.home", "name": "Home", "color": "#4A7DD6" },
+    { "entity": "calendar.work", "name": "Work", "color": "#E8A13C" }
+  ],
+  "tasks": [
+    { "name": "Person A", "entity": "todo.person_a", "color": "#A9C0F5" },
+    { "name": "Person B", "entity": "todo.person_b", "color": "#F5AFC0" },
+    { "name": "House", "entity": "todo.house", "color": "#A8DFB2" }
+  ],
+  "meals": [
+    { "name": "Menu", "entity": "todo.menu", "color": "#FCE7EC" }
+  ],
+  "lists": [
+    { "name": "Groceries", "entity": "todo.groceries" },
+    { "name": "Shopping List", "entity": "todo.shopping_list" }
+  ],
+  "rewards": [
+    { "name": "Person A", "entity": "counter.person_a_stars" },
+    { "name": "Person B", "entity": "counter.person_b_stars" }
+  ],
+  "people": ["Person A", "Person B"],
+  "photos": { "intervalSeconds": 15 },
+  "smartHome": {
+    "climate": "climate.thermostat",
+    "cameras": [
+      { "name": "Front door", "entity": "camera.front_door", "zoomEntity": "camera.front_door_hd" }
+    ],
+    "sensors": [
+      { "name": "Pool", "entity": "sensor.pool_temperature", "icon": "pool" },
+      { "name": "Air quality", "entity": "sensor.air_quality_index", "icon": "air" },
+      { "name": "UV", "entity": "sensor.uv_index", "icon": "sun" },
+      { "name": "Feels like", "entity": "sensor.feels_like_temperature", "icon": "temp" }
+    ],
+    "lights": [
+      { "name": "Living room", "entity": "light.living_room" },
+      { "name": "Kitchen", "entity": "light.kitchen" }
+    ],
+    "locks": [
+      { "name": "Front door", "entity": "lock.front_door" }
+    ],
+    "alarm": "alarm_control_panel.home_alarm"
+  },
+  "dashboard": {
+    "cols": 12,
+    "rows": 9,
+    "tiles": [
+      { "id": "calendar", "x": 0, "y": 0, "w": 6, "h": 9 },
+      { "id": "weather", "x": 6, "y": 0, "w": 3, "h": 4 },
+      { "id": "meals", "x": 9, "y": 0, "w": 3, "h": 4 },
+      { "id": "photo", "x": 6, "y": 4, "w": 4, "h": 5 },
+      { "id": "rewards", "x": 10, "y": 4, "w": 2, "h": 5 }
+    ]
+  }
+}
