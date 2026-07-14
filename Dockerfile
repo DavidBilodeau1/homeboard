@@ -10,6 +10,8 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+# ffmpeg: repackage camera RTSP → HLS directly (bypassing Home Assistant)
+RUN apk add --no-cache ffmpeg
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev && npm cache clean --force
 COPY server ./server

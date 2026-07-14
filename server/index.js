@@ -1,8 +1,10 @@
 import express from 'express'
 import { createServer } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
+import { spawn } from 'child_process'
 import crypto from 'crypto'
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { mockRouter } from './mock.js'
@@ -247,17 +249,124 @@ function haCommand(type, payload = {}) {
   })
 }
 
-// Mint an HLS playlist URL for a camera and return it rewritten to go through
-// our /api/ha proxy, so the browser never talks to HA directly and the token
-// stays server-side. HA's signed path token authorizes the segment fetches.
+// ---------- direct camera streaming (ffmpeg: RTSP → HLS, bypassing HA) ----------
+// When a camera in config has an `rtsp` (and/or `rtspZoom`) URL, HomeBoard pulls
+// the feed straight from the camera and repackages it to HLS with ffmpeg — no HA
+// in the video path. The RTSP URL (with credentials) never leaves the server;
+// the browser only sees /api/camstream/<entity>/… . Falls back to HA if the
+// direct feed can't be produced.
+const CAM_ROOT = path.join(os.tmpdir(), 'homeboard-cam')
+const camDir = (entity) => path.join(CAM_ROOT, entity.replace(/[^a-z0-9_.]/gi, '_'))
+const cams = new Map() // entity -> { proc, lastAccess }
+
+function rtspForEntity(entity) {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'))
+    for (const c of cfg.smartHome?.cameras ?? []) {
+      if (c.entity === entity && c.rtsp) return c.rtsp
+      if (c.zoomEntity === entity && c.rtspZoom) return c.rtspZoom
+    }
+  } catch { /* config unreadable */ }
+  return null
+}
+
+function startCam(entity, rtsp) {
+  const existing = cams.get(entity)
+  if (existing && existing.proc && existing.proc.exitCode === null) {
+    existing.lastAccess = Date.now()
+    return existing
+  }
+  const dir = camDir(entity)
+  fs.mkdirSync(dir, { recursive: true })
+  for (const f of fs.readdirSync(dir)) { try { fs.unlinkSync(path.join(dir, f)) } catch { /* ignore */ } }
+  // -c:v copy (no transcode, light CPU), low-latency HLS, drop audio for reliability
+  const proc = spawn('ffmpeg', [
+    '-nostdin', '-loglevel', 'error',
+    '-rtsp_transport', 'tcp',
+    '-i', rtsp,
+    '-an', '-c:v', 'copy',
+    '-f', 'hls',
+    '-hls_time', '1',
+    '-hls_list_size', '6',
+    '-hls_flags', 'delete_segments+append_list+omit_endlist',
+    '-hls_segment_type', 'mpegts',
+    '-hls_segment_filename', 'seg%d.ts',
+    'index.m3u8',
+  ], { cwd: dir })
+  let errTail = ''
+  proc.stderr.on('data', (d) => { errTail = (errTail + d).slice(-500) })
+  proc.on('exit', (code) => {
+    if (code) console.warn(`[homeboard] ffmpeg for ${entity} exited (${code}): ${errTail.trim()}`)
+    if (cams.get(entity)?.proc === proc) cams.delete(entity)
+  })
+  const cam = { proc, lastAccess: Date.now() }
+  cams.set(entity, cam)
+  return cam
+}
+
+const waitForPlaylist = (dir, ms) => new Promise((resolve) => {
+  const started = Date.now()
+  const tick = () => {
+    // ready once the playlist exists and references at least one segment
+    try {
+      const pl = fs.readFileSync(path.join(dir, 'index.m3u8'), 'utf8')
+      if (/\.ts/.test(pl)) return resolve(true)
+    } catch { /* not yet */ }
+    if (Date.now() - started > ms) return resolve(false)
+    setTimeout(tick, 250)
+  }
+  tick()
+})
+
+// kill idle ffmpeg processes (no segment/playlist fetch in the last 40s)
+setInterval(() => {
+  const now = Date.now()
+  for (const [entity, cam] of cams) {
+    if (now - cam.lastAccess > 40_000) {
+      try { cam.proc.kill('SIGKILL') } catch { /* ignore */ }
+      cams.delete(entity)
+    }
+  }
+}, 15_000)
+
+// serve the ffmpeg-generated HLS files (gated by the /api requireAuth above)
+app.get('/api/camstream/:entity/:file', (req, res) => {
+  const { entity, file } = req.params
+  if (!/^camera\.[a-z0-9_]+$/.test(entity) || !/^[a-z0-9_.]+$/i.test(file)) return res.status(400).end()
+  const dir = camDir(entity)
+  const fp = path.join(dir, file)
+  if (!fp.startsWith(dir + path.sep)) return res.status(400).end()
+  const cam = cams.get(entity)
+  if (cam) cam.lastAccess = Date.now()
+  if (!fs.existsSync(fp)) return res.status(404).end()
+  res.set('Cache-Control', 'no-store')
+  res.type(file.endsWith('.m3u8') ? 'application/vnd.apple.mpegurl' : 'video/mp2t')
+  fs.createReadStream(fp).pipe(res)
+})
+
+// Return an HLS URL for a camera: direct (ffmpeg from RTSP) when configured,
+// otherwise Home Assistant's HLS. The browser plays either with the same hls.js.
 app.get('/api/camera/:entity/stream', async (req, res) => {
   const entity = req.params.entity
   if (!/^camera\.[a-z0-9_]+$/.test(entity)) return res.status(400).json({ error: 'invalid entity' })
-  if (MOCK) return res.status(501).json({ error: 'mock mode: no live stream' })
+
+  const rtsp = rtspForEntity(entity)
+  if (rtsp) {
+    try {
+      const cam = startCam(entity, rtsp)
+      const ready = await waitForPlaylist(camDir(entity), 12_000)
+      if (ready) return res.json({ url: `/api/camstream/${entity}/index.m3u8`, direct: true })
+      console.warn(`[homeboard] direct RTSP for ${entity} not ready — falling back to HA`)
+    } catch (e) {
+      console.warn(`[homeboard] direct RTSP for ${entity} failed (${e.message}) — falling back to HA`)
+    }
+  }
+
+  // fallback: Home Assistant's HLS, proxied so the token stays server-side
+  if (MOCK) return res.status(501).json({ error: 'no stream available' })
   try {
     const result = await haCommand('camera/stream', { entity_id: entity, format: 'hls' })
     if (!result?.url) return res.status(502).json({ error: 'HA returned no stream url' })
-    // result.url looks like /api/hls/<token>/master_playlist.m3u8
     res.json({ url: '/api/ha' + result.url.replace(/^\/api/, '') })
   } catch (e) {
     res.status(502).json({ error: `stream request failed: ${e.message}` })

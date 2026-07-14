@@ -34,6 +34,9 @@ export interface NamedEntity {
   icon?: string
   /** cameras: higher-resolution entity used for the fullscreen overlay */
   zoomEntity?: string
+  /** cameras: RTSP URL to stream directly (bypassing HA); rtspZoom = fullscreen */
+  rtsp?: string
+  rtspZoom?: string
 }
 
 export interface SmartHomeCfg {

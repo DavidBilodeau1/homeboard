@@ -121,11 +121,11 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
 /* ---------- main / topbar ---------- */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 0 20px 18px 0; }
-.topbar { position: relative; display: flex; align-items: center; gap: 16px; padding: 14px 4px 12px; }
+.topbar { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 14px 4px 12px; }
 .tb-menu { color: var(--ink); display: flex; padding: 6px; border-radius: 10px; flex: none; }
 .tb-menu:hover { background: var(--card); }
-.tb-date { font-size: 1.875rem; font-weight: 800; }
-.tb-time { font-size: 1.625rem; font-weight: 700; color: var(--ink); }
+.tb-date { font-size: 1.875rem; font-weight: 800; white-space: nowrap; }
+.tb-time { font-size: 1.625rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .tb-weather { display: flex; align-items: center; gap: 8px; font-size: 1.188rem; font-weight: 700; color: var(--muted); }
 .tb-garbage {
   display: inline-flex; align-items: center; gap: 7px;
@@ -893,13 +893,25 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 /* Phones: the dashboard switches to a scrolling stacked layout in JS; here we
    just tighten the chrome so the header and sidebar fit. */
 @media (max-width: 700px) {
-  .main { padding: 0 12px 12px 0; }
+  .main { padding: 0 12px 12px 0; min-width: 0; }
   .sidebar { width: 62px; }
   .side-btn { width: 54px; font-size: 0.5938rem; }
-  .topbar { gap: 10px; flex-wrap: nowrap; }
+  /* wrap the header instead of forcing a min width (which caused horizontal
+     scroll); each item stays intact, alert chips flow to a second row */
+  .topbar { gap: 8px 10px; flex-wrap: wrap; row-gap: 8px; }
   .tb-date { font-size: 1.125rem; white-space: nowrap; }
   .tb-time { font-size: 1rem; white-space: nowrap; }
   .tb-weather { display: none; }   /* redundant with the weather tile; saves header room */
   .tb-air-ok { display: none; }    /* keep only the unsafe air alert on phones */
-  .tb-right { gap: 10px; }
+  /* let the alert chip + controls share the second row instead of forcing a 3rd */
+  .tb-right { gap: 10px; margin-left: 0; }
+  .tb-garbage, .tb-airalert { font-size: 0.8125rem; max-width: 100%; }
+
+  /* settings editor: stack labels over controls, let rows wrap */
+  .ed-field { flex-direction: column; align-items: stretch; gap: 5px; }
+  .ed-field > span { width: auto; }
+  .ed-select { max-width: none; }
+  .ed-row { flex-wrap: wrap; }
+  .ed-row .ed-input { max-width: none; flex: 1 1 100%; }
+  .settings-row { flex-wrap: wrap; gap: 6px; }
 }
