@@ -38,6 +38,16 @@ export const fmtMonthLong = (d: Date, locale: string) =>
 export const fmtWeekdayShort = (d: Date, locale: string) =>
   new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d)
 
+/** AQI color: green at/below the safe threshold, then escalating warning colors. */
+export const aqiColor = (v: number, safeMax: number): string => {
+  if (v <= safeMax) return '#3d9b63'
+  if (v <= 100) return '#e0913c'
+  if (v <= 150) return '#e0673c'
+  if (v <= 200) return '#d64545'
+  if (v <= 300) return '#8f3f97'
+  return '#7e2323'
+}
+
 export const weekdayNames = (locale: string): string[] => {
   const base = new Date(2023, 0, 1) // a Sunday
   return Array.from({ length: 7 }, (_, i) =>

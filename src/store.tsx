@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import type { AppConfig, CalEvent, TodoItem, ForecastDay, WeatherState, ThemeMode, EntityState, PersonState, GarbageCollection } from './types'
+import type { AppConfig, CalEvent, TodoItem, ForecastDay, WeatherState, ThemeMode, EntityState, PersonState, GarbageCollection, AirQualityState } from './types'
 import * as api from './api'
 import { addDays, dayKey, monthGrid, startOfMonth } from './util'
 import { makeT, resolveLanguage, type Translate } from './i18n'
@@ -41,7 +41,10 @@ interface Store {
   saveConfig: (next: AppConfig) => Promise<boolean>
   persons: PersonState[]
   garbage: GarbageCollection[]
+  airQuality: AirQualityState | null
 }
+
+const aqiEntity = (cfg: AppConfig | null): string | null => cfg?.airQuality?.entity ?? null
 
 const garbageEntities = (cfg: AppConfig | null): string[] =>
   (cfg?.garbage ?? []).map((g) => g.entity).filter(Boolean)
@@ -91,6 +94,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [todos, setTodos] = useState<Record<string, TodoItem[]>>({})
   const [calEvents, setCalEvents] = useState<CalEvent[]>([])
   const [garbage, setGarbage] = useState<GarbageCollection[]>([])
+  const [airQuality, setAirQuality] = useState<AirQualityState | null>(null)
   const [weather, setWeather] = useState<WeatherState | null>(null)
   const [forecast, setForecast] = useState<ForecastDay[]>([])
   const [rewardValues, setRewardValues] = useState<Record<string, number | null>>({})
@@ -210,6 +214,18 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setGarbage(results)
   }, [])
 
+  const refreshAirQuality = useCallback(async (cfg: AppConfig) => {
+    const aq = cfg.airQuality
+    if (!aq?.entity) { setAirQuality(null); return }
+    const st = await api.getState(aq.entity)
+    const v = st ? Number(st.state) : NaN
+    setAirQuality({
+      value: Number.isFinite(v) ? v : null,
+      safeMax: aq.safeMax ?? 50,
+      name: aq.name ?? 'Air quality',
+    })
+  }, [])
+
   const refreshAll = useCallback((cfg: AppConfig, cursor: Date) => {
     refreshTodos(cfg)
     refreshEvents(cfg, cursor)
@@ -217,7 +233,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     refreshRewards(cfg)
     refreshEntities(cfg)
     refreshGarbage(cfg)
-  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshEntities, refreshGarbage])
+    refreshAirQuality(cfg)
+  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshEntities, refreshGarbage, refreshAirQuality])
 
   // keep latest refresh closure available to the websocket handler
   const refresher = useRef<{ cfg: AppConfig | null; cursor: Date }>({ cfg: null, cursor: monthCursor })
@@ -313,6 +330,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           else if (id === 'sun.sun') debounced('sun', refreshSun)
           else if (id.startsWith('person.')) debounced('persons', refreshPersons)
           else if (garbageEntities(cfg).includes(id)) debounced('garbage', () => refreshGarbage(cfg))
+          else if (id === aqiEntity(cfg)) debounced('aqi', () => refreshAirQuality(cfg))
           else if (smartHomeEntities(cfg).includes(id) || extraRef.current.includes(id))
             debounced('ent', () => refreshEntities(cfg))
         } catch { /* ignore malformed frames */ }
@@ -328,7 +346,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       Object.values(timers).forEach(clearTimeout)
       ws?.close()
     }
-  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshSun, refreshEntities, refreshPersons, refreshGarbage])
+  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshSun, refreshEntities, refreshPersons, refreshGarbage, refreshAirQuality])
 
   // ----- actions -----
   const toggleItem = useCallback(async (entity: string, item: TodoItem) => {
@@ -407,10 +425,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
     monthCursor, setMonthCursor, selectedDate, setSelectedDate,
-    toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage,
+    toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality,
   }), [config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
-    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage])
+    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

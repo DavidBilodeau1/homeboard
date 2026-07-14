@@ -87,6 +87,14 @@ export const WifiIcon = () => (
   </I>
 )
 
+export const AlertIcon = ({ size = 20 }: { size?: number }) => (
+  <I size={size}>
+    <path d="M12 3.2 21 19H3z" />
+    <line x1="12" y1="9.5" x2="12" y2="14" />
+    <circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none" />
+  </I>
+)
+
 export const BinIcon = ({ size = 18 }: { size?: number }) => (
   <I size={size}>
     <path d="M4 7h16" />

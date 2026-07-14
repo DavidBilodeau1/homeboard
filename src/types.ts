@@ -12,7 +12,7 @@ export interface ListCfg {
 
 export type ThemeMode = 'auto' | 'light' | 'dark' | 'sun'
 
-export type TileId = 'calendar' | 'calendarFull' | 'photo' | 'tasks' | 'weather' | 'meals' | 'rewards'
+export type TileId = 'calendar' | 'calendarFull' | 'photo' | 'tasks' | 'weather' | 'meals' | 'rewards' | 'airQuality'
 
 export interface DashboardTile {
   id: TileId
@@ -67,6 +67,18 @@ export interface GarbageCollection {
   color: string
   dayKey: string | null   // local calendar day of the next collection
   daysUntil: number | null // 0 = today, 1 = tomorrow, …
+}
+
+export interface AirQualityCfg {
+  entity: string
+  name?: string
+  safeMax?: number // AQI at or below this is "safe"; above it is flagged unsafe
+}
+
+export interface AirQualityState {
+  value: number | null
+  safeMax: number
+  name: string
 }
 
 /** A [feet, inches] measurement, e.g. [10, 6] = 10′6″. */
@@ -141,6 +153,7 @@ export interface AppConfig {
   smartHome?: SmartHomeCfg
   dashboard?: DashboardLayout
   garbage?: GarbageCfg[]
+  airQuality?: AirQualityCfg
   floorPlan?: FloorPlanCfg
 }
 

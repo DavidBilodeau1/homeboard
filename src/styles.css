@@ -135,6 +135,23 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   box-shadow: 0 1px 4px rgba(0,0,0,0.12);
 }
 .tb-garbage svg { flex: none; }
+.tb-airalert {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 14px 5px 11px; border-radius: 999px;
+  color: #fff; font-size: 0.9375rem; font-weight: 800;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.18);
+  animation: aq-pulse 1.8s ease-in-out infinite;
+}
+.tb-airalert svg { flex: none; }
+@keyframes aq-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.72; } }
+.tb-air-ok {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 11px; border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 78%, #3d9b63);
+  color: #2f7d4e; font-size: 0.9375rem; font-weight: 800;
+}
+[data-theme='dark'] .tb-air-ok { color: #6fce97; }
+.tb-air-ok svg { flex: none; }
 .tb-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .tb-avatars { display: flex; align-items: center; background: var(--card); border-radius: 999px; padding: 4px 9px 4px 5px; cursor: pointer; }
 .tb-avatar {
@@ -375,6 +392,21 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 [data-theme='dark'] .meal-items li { color: #cfc9d6; }
 .meal-items .meal-empty { color: #8d8a94; font-style: italic; }
 [data-theme='dark'] .meal-items .meal-empty { color: var(--muted); }
+
+/* ---------- air quality card ---------- */
+.aq-card { display: flex; flex-direction: column; }
+.aq-card.unsafe {
+  background: color-mix(in srgb, var(--card) 82%, var(--aq));
+  box-shadow: 0 0 0 2px var(--aq) inset;
+}
+.aq-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.aq-value { font-size: 3.25rem; font-weight: 800; line-height: 1; color: var(--aq); }
+.aq-status { display: inline-flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 800; color: var(--aq); }
+.aq-warning {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  margin-top: 8px; padding: 8px; border-radius: 10px;
+  background: var(--aq); color: #fff; font-size: 0.9375rem; font-weight: 800; text-align: center;
+}
 
 /* ---------- rewards card ---------- */
 .rewards-card { grid-column: 4; grid-row: 2; display: flex; flex-direction: column; }
@@ -868,5 +900,6 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   .tb-date { font-size: 1.125rem; white-space: nowrap; }
   .tb-time { font-size: 1rem; white-space: nowrap; }
   .tb-weather { display: none; }   /* redundant with the weather tile; saves header room */
+  .tb-air-ok { display: none; }    /* keep only the unsafe air alert on phones */
   .tb-right { gap: 10px; }
 }

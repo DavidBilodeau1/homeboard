@@ -11,6 +11,7 @@ import { useStore } from '../store'
 import type { DashboardTile, TileId } from '../types'
 import { DEFAULT_SIZE, GRID_MARGIN, GRID_ROWS, TILE_META, resolveLayout } from '../dashboardLayout'
 import { CalendarFullCard } from '../components/CalendarFullCard'
+import { AirQualityCard } from '../components/AirQualityCard'
 import { EditIcon, PlusIcon, TrashIcon } from '../icons'
 
 const RGL = WidthProvider(GridLayout)
@@ -68,6 +69,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
       case 'weather': return <WeatherCard />
       case 'meals': return <MealsCard onOpen={() => !editing && onNavigate('meals')} />
       case 'rewards': return <RewardsCard />
+      case 'airQuality': return <AirQualityCard />
     }
   }
 

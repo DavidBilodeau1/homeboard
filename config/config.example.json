@@ -62,6 +62,11 @@
     { "name": "Recycle", "entity": "sensor.recycle_schedule", "color": "#4a7dd6" },
     { "name": "Compost", "entity": "sensor.compost_schedule", "color": "#8a5a3b" }
   ],
+  "airQuality": {
+    "entity": "sensor.air_quality_index",
+    "name": "Air Quality",
+    "safeMax": 50
+  },
   "floorPlan": {
     "house": { "w": [37, 6], "h": [24, 9] },
     "floors": [

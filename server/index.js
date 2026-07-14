@@ -192,6 +192,12 @@ function validateConfig(c) {
   if (c.garbage !== undefined && !isNamedRows(c.garbage)) {
     return 'garbage must be an array of { name, entity, color }'
   }
+  if (c.airQuality !== undefined && c.airQuality !== null) {
+    const a = c.airQuality
+    if (typeof a !== 'object' || Array.isArray(a) || typeof a.entity !== 'string') {
+      return 'airQuality must be an object with an entity string'
+    }
+  }
   if (c.dashboard !== undefined) {
     const d = c.dashboard
     if (!d || typeof d !== 'object' || Array.isArray(d)) return 'dashboard must be an object'

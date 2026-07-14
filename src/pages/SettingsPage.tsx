@@ -99,7 +99,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="ed-field"><span>{label}</span>{children}</label>
 }
 
-const TABS = ['general', 'calendars', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'garbage', 'json'] as const
+const TABS = ['general', 'calendars', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'garbage', 'air', 'json'] as const
 type Tab = (typeof TABS)[number]
 
 export function SettingsPage() {
@@ -118,7 +118,7 @@ export function SettingsPage() {
   const tabLabel: Record<Tab, string> = useMemo(() => ({
     general: t('settings.general'), calendars: t('nav.calendar'), tasks: t('nav.tasks'),
     meals: t('nav.meals'), lists: t('nav.lists'), rewards: t('nav.rewards'),
-    smarthome: t('nav.home'), garbage: t('settings.garbage'), json: t('settings.json'),
+    smarthome: t('nav.home'), garbage: t('settings.garbage'), air: t('settings.air'), json: t('settings.json'),
   }), [t])
 
   if (!draft) return <div className="card page-card settings-page"><h2 className="card-title">{t('settings.title')}</h2></div>
@@ -284,6 +284,24 @@ export function SettingsPage() {
                 <p className="settings-note" style={{ margin: 0 }}>{t('settings.garbageHint')}</p>
                 <ListEditor rows={(draft.garbage ?? []) as Row[]} domains={['sensor']} options={options} withColor t={t}
                   onChange={(rows) => up((d) => { d.garbage = rows.filter((r) => r.entity).map((r) => ({ name: r.name, entity: r.entity as string, color: r.color ?? '#3d9b63' })) })} />
+              </div>
+            )}
+
+            {tab === 'air' && (
+              <div className="ed-fields">
+                <p className="settings-note" style={{ margin: 0 }}>{t('settings.airHint')}</p>
+                <Field label={t('settings.airEntity')}>
+                  <EntitySelect value={draft.airQuality?.entity} domains={['sensor']} options={options} noneLabel={t('settings.none')}
+                    onChange={(v) => up((d) => { d.airQuality = v ? { ...d.airQuality, entity: v } : undefined })} />
+                </Field>
+                <Field label={t('settings.airName')}>
+                  <input className="ed-input" value={draft.airQuality?.name ?? ''} disabled={!draft.airQuality}
+                    onChange={(e) => up((d) => { if (d.airQuality) d.airQuality.name = e.target.value })} />
+                </Field>
+                <Field label={t('settings.airThreshold')}>
+                  <input className="ed-input" type="number" min={0} value={draft.airQuality?.safeMax ?? 50} disabled={!draft.airQuality}
+                    onChange={(e) => up((d) => { if (d.airQuality) d.airQuality.safeMax = Number(e.target.value) || 0 })} />
+                </Field>
               </div>
             )}
 

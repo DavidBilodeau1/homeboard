@@ -90,7 +90,7 @@ const live = {
     state: '77.6', attributes: { unit_of_measurement: '°F', device_class: 'temperature' },
   },
   'sensor.saguenay_secteur_de_sainte_therese_arvida_quebec_canada_air_quality_index': {
-    state: '33', attributes: { device_class: 'aqi' },
+    state: '41', attributes: { device_class: 'aqi' },
   },
   'sensor.uv_index': { state: '5', attributes: {} },
   'sensor.feels_like_temperature': { state: '11', attributes: { unit_of_measurement: '°C' } },
