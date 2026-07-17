@@ -85,6 +85,17 @@ const live = {
   'light.chambre_dalphonse_chambre_dalphonse': { state: 'on', attributes: { friendly_name: 'Ch. Alphonse' } },
   'camera.front_door_doorbell_fluent': { state: 'idle', attributes: { friendly_name: 'Porte avant' } },
   'lock.front_door': { state: 'locked', attributes: { friendly_name: 'Porte avant' } },
+  'media_player.salon': {
+    state: 'playing',
+    attributes: {
+      friendly_name: 'Salon', media_title: 'Here Comes the Sun',
+      media_artist: 'The Beatles', volume_level: 0.35,
+    },
+  },
+  'media_player.cuisine': {
+    state: 'paused',
+    attributes: { friendly_name: 'Cuisine', media_title: 'Radio-Canada Première', volume_level: 0.2 },
+  },
   'alarm_control_panel.home_alarm': { state: 'disarmed', attributes: { friendly_name: 'Home Alarm' } },
   'sensor.pool_thermometer_pool_thermometer': {
     state: '77.6', attributes: { unit_of_measurement: '°F', device_class: 'temperature' },
@@ -241,6 +252,18 @@ export function mockRouter() {
   r.post('/services/lock/:svc', (req, res) => {
     const l = live[req.body?.entity_id]
     if (l) l.state = req.params.svc === 'lock' ? 'locked' : 'unlocked'
+    res.json([])
+  })
+
+  r.post('/services/media_player/:svc', (req, res) => {
+    const m = live[req.body?.entity_id]
+    if (m) {
+      const svc = req.params.svc
+      if (svc === 'media_play_pause') m.state = m.state === 'playing' ? 'paused' : 'playing'
+      else if (svc === 'media_play') m.state = 'playing'
+      else if (svc === 'media_pause') m.state = 'paused'
+      else if (svc === 'volume_set' && typeof req.body?.volume_level === 'number') m.attributes.volume_level = req.body.volume_level
+    }
     res.json([])
   })
 

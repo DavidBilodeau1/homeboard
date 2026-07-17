@@ -1,7 +1,7 @@
 {
   "locale": "en-US",
   "language": "en",
-  "theme": "auto",
+  "theme": "sun",
   "weatherEntity": "weather.home",
   "calendars": [
     { "entity": "calendar.family", "name": "Family", "color": "#C33C54" },
@@ -43,6 +43,10 @@
     ],
     "locks": [
       { "name": "Front door", "entity": "lock.front_door" }
+    ],
+    "mediaPlayers": [
+      { "name": "Living room", "entity": "media_player.living_room" },
+      { "name": "Kitchen", "entity": "media_player.kitchen" }
     ],
     "alarm": "alarm_control_panel.home_alarm"
   },

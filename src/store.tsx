@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState,
 import type { AppConfig, CalEvent, TodoItem, ForecastDay, WeatherState, ThemeMode, EntityState, PersonState, GarbageCollection, AirQualityState } from './types'
 import * as api from './api'
 import { addDays, dayKey, monthGrid, startOfMonth } from './util'
+import { normalizeEvents } from './events'
 import { makeT, resolveLanguage, type Translate } from './i18n'
 
 interface SystemInfo {
@@ -60,6 +61,7 @@ const smartHomeEntities = (cfg: AppConfig | null): string[] => {
     ...(sh.sensors ?? []).map((s) => s.entity),
     ...(sh.lights ?? []).map((l) => l.entity),
     ...(sh.locks ?? []).map((l) => l.entity),
+    ...(sh.mediaPlayers ?? []).map((m) => m.entity),
   ].filter((e): e is string => !!e)
 }
 
@@ -70,23 +72,6 @@ export const useStore = () => {
   if (!s) throw new Error('store missing')
   return s
 }
-
-const normalizeEvents = (raw: any[], entity: string, color: string): CalEvent[] =>
-  raw.map((e) => {
-    const allDay = !!e.start?.date
-    const start: string = e.start?.dateTime ?? e.start?.date ?? ''
-    const end: string = e.end?.dateTime ?? e.end?.date ?? start
-    const dayKeys: string[] = []
-    let d = new Date(allDay ? start + 'T00:00:00' : start)
-    // all-day events end on the day AFTER the last day (exclusive)
-    const stop = allDay ? addDays(new Date(end + 'T00:00:00'), -1) : new Date(end)
-    for (let i = 0; i < 60; i++) {
-      dayKeys.push(dayKey(d))
-      if (dayKey(d) >= dayKey(stop)) break
-      d = addDays(d, 1)
-    }
-    return { summary: e.summary ?? '(no title)', start, end, allDay, calendar: entity, color, dayKeys }
-  })
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<AppConfig | null>(null)
@@ -312,10 +297,22 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timers[kind])
       timers[kind] = setTimeout(fn, 400)
     }
+    let everConnected = false
     const connect = () => {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
       ws = new WebSocket(`${proto}://${location.host}/ws`)
-      ws.onopen = () => setConnected(true)
+      ws.onopen = () => {
+        setConnected(true)
+        // catch up on anything missed while the socket was down (server
+        // restart, tablet sleep, wifi blip) — the boot effect covers first open
+        if (everConnected) {
+          const { cfg, cursor } = refresher.current
+          if (cfg) refreshAll(cfg, cursor)
+          refreshSun()
+          refreshPersons()
+        }
+        everConnected = true
+      }
       ws.onmessage = (e) => {
         const { cfg, cursor } = refresher.current
         if (!cfg) return
@@ -346,7 +343,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       Object.values(timers).forEach(clearTimeout)
       ws?.close()
     }
-  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshSun, refreshEntities, refreshPersons, refreshGarbage, refreshAirQuality])
+  }, [refreshAll, refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshSun, refreshEntities, refreshPersons, refreshGarbage, refreshAirQuality])
 
   // ----- actions -----
   const toggleItem = useCallback(async (entity: string, item: TodoItem) => {

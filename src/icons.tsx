@@ -307,3 +307,35 @@ export const WeatherIcon = ({ condition, size = 22 }: { condition: string; size?
       return base(cloud('#C9CDD6'))
   }
 }
+
+export const MusicIcon = ({ size = 22 }: { size?: number }) => (
+  <I size={size}>
+    <path d="M9 18V6.5l10-2V16" />
+    <circle cx="6.8" cy="18" r="2.2" />
+    <circle cx="16.8" cy="16" r="2.2" />
+  </I>
+)
+
+export const PlayIcon = ({ size = 22 }: { size?: number }) => (
+  <I size={size}><path d="M8 5.5v13l10-6.5z" /></I>
+)
+
+export const PauseIcon = ({ size = 22 }: { size?: number }) => (
+  <I size={size}><line x1="9" y1="5.5" x2="9" y2="18.5" /><line x1="15" y1="5.5" x2="15" y2="18.5" /></I>
+)
+
+export const PrevTrackIcon = ({ size = 22 }: { size?: number }) => (
+  <I size={size}><line x1="6.5" y1="6" x2="6.5" y2="18" /><path d="M17.5 6l-8.5 6 8.5 6z" /></I>
+)
+
+export const NextTrackIcon = ({ size = 22 }: { size?: number }) => (
+  <I size={size}><path d="M6.5 6l8.5 6-8.5 6z" /><line x1="17.5" y1="6" x2="17.5" y2="18" /></I>
+)
+
+export const SpeakerIcon = ({ size = 22 }: { size?: number }) => (
+  <I size={size}>
+    <path d="M4.5 9.5h3l4-3.5v12l-4-3.5h-3z" />
+    <path d="M15 9a4.2 4.2 0 0 1 0 6" />
+    <path d="M17.8 6.8a8 8 0 0 1 0 10.4" />
+  </I>
+)

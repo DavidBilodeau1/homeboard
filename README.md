@@ -13,7 +13,10 @@ browser) and receives instant updates over the HA WebSocket API.
 - **Tasks / Lists / Meals** — HA `todo` lists: check off, add, delete items
 - **Rewards** — HA `counter` helpers with +/− buttons
 - **Photos** — fullscreen slideshow from a mounted folder
-- Live updates via WebSocket (state changes appear within ~1s), 5-min polling fallback
+- Live updates via WebSocket (state changes appear within ~1s), 5-min polling
+  fallback, full refresh on reconnect after an outage
+- **PWA** — installable from the browser ("Add to Home Screen") for a
+  chrome-less fullscreen app on tablets and phones
 - **Mock mode** — runs with demo data when `HA_URL`/`HA_TOKEN` are not set
 
 ## Quick start (Docker)
@@ -96,6 +99,9 @@ Mounted as a volume. Two ways to edit:
 - `rewards` — `{ name, entity }` where entity is a `counter.*` helper
   (create one in HA: Settings → Devices & services → Helpers → Counter);
   shows `–` until the helper exists
+- `smartHome.mediaPlayers` — `{ name, entity (media_player.*) }` rows shown as
+  a Media card on the Home page: now playing, play/pause, previous/next,
+  volume slider
 - `people` — names for the avatar cluster in the top bar
 - `photos.intervalSeconds` — slideshow speed
 - `locale` — e.g. `en-US` or `fr-CA` (affects date/time formatting)
@@ -136,7 +142,13 @@ Photo sources, in priority order:
 npm install
 npm run start          # backend on :8090 (mock mode without HA_URL/HA_TOKEN)
 npm run dev            # Vite dev server on :5173, proxies /api and /ws
+npm run typecheck      # tsc --noEmit
+npm run lint           # eslint
+npm test               # vitest (event normalization + config validation)
+npm run icons          # regenerate the PWA icons in public/icons/
 ```
+
+CI (GitHub Actions) runs typecheck, lint, tests and the build on every push/PR.
 
 To develop against your real HA instance:
 

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { DashboardProvider, useStore } from './store'
 import { Sidebar, type Page } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
+import { PageBoundary } from './components/ErrorBoundary'
 import { LoginScreen } from './components/LoginScreen'
 import { makeT, resolveLanguage } from './i18n'
 import { Dashboard } from './pages/Dashboard'
@@ -43,16 +44,19 @@ function Shell() {
       <div className="main">
         <TopBar onToggleSidebar={toggleSidebar} />
         <div className="content">
-          {page === 'dashboard' && <Dashboard onNavigate={navigate} />}
-          {page === 'home' && <SmartHomePage />}
-          {page === 'floorplan' && <FloorPlanPage />}
-          {page === 'calendar' && <CalendarPage />}
-          {page === 'tasks' && <TodoBoardPage title={t('nav.tasks')} lists={config?.tasks ?? []} />}
-          {page === 'rewards' && <RewardsPage />}
-          {page === 'lists' && <TodoBoardPage title={t('nav.lists')} lists={config?.lists ?? []} />}
-          {page === 'meals' && <TodoBoardPage title={t('nav.meals')} lists={config?.meals ?? []} />}
-          {page === 'photos' && <PhotosPage />}
-          {page === 'settings' && <SettingsPage />}
+          {/* keyed by page so navigating away resets a tripped boundary */}
+          <PageBoundary key={page}>
+            {page === 'dashboard' && <Dashboard onNavigate={navigate} />}
+            {page === 'home' && <SmartHomePage />}
+            {page === 'floorplan' && <FloorPlanPage />}
+            {page === 'calendar' && <CalendarPage />}
+            {page === 'tasks' && <TodoBoardPage title={t('nav.tasks')} lists={config?.tasks ?? []} />}
+            {page === 'rewards' && <RewardsPage />}
+            {page === 'lists' && <TodoBoardPage title={t('nav.lists')} lists={config?.lists ?? []} />}
+            {page === 'meals' && <TodoBoardPage title={t('nav.meals')} lists={config?.meals ?? []} />}
+            {page === 'photos' && <PhotosPage />}
+            {page === 'settings' && <SettingsPage />}
+          </PageBoundary>
         </div>
       </div>
     </div>

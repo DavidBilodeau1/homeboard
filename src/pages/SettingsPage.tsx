@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { haGet } from '../api'
 import { availableLanguages } from '../i18n'
-import type { AppConfig, ListCfg, NamedEntity, ThemeMode } from '../types'
+import type { AppConfig, NamedEntity, ThemeMode } from '../types'
 
 const THEME_OPTIONS: { id: ThemeMode; labelKey: string }[] = [
   { id: 'auto', labelKey: 'settings.themeAuto' },
@@ -46,7 +46,7 @@ function EntitySelect({ value, onChange, domains, options, noneLabel }: {
   )
 }
 
-type Row = ListCfg & NamedEntity & { color?: string; icon?: string }
+type Row = { name: string; entity: string | null; color?: string; icon?: string }
 
 function ListEditor({ rows, onChange, domains, options, withColor, withIcon, t }: {
   rows: Row[]
@@ -235,7 +235,7 @@ export function SettingsPage() {
 
             {tab === 'calendars' && (
               <ListEditor rows={draft.calendars as Row[]} domains={['calendar']} options={options} withColor t={t}
-                onChange={(rows) => up((d) => { d.calendars = rows.map((r) => ({ ...r, entity: r.entity ?? '' })) })} />
+                onChange={(rows) => up((d) => { d.calendars = rows.map((r) => ({ ...r, entity: r.entity ?? '', color: r.color ?? '#c33c54' })) })} />
             )}
             {tab === 'tasks' && (
               <ListEditor rows={draft.tasks as Row[]} domains={['todo']} options={options} withColor t={t}
@@ -273,6 +273,9 @@ export function SettingsPage() {
                 <h3 className="ed-subtitle">{t('home.lights')}</h3>
                 <ListEditor rows={(sh.lights ?? []) as Row[]} domains={['light', 'switch']} options={options} t={t}
                   onChange={(rows) => upSh((s) => { s.lights = rows.filter((r) => r.entity) as NamedEntity[] })} />
+                <h3 className="ed-subtitle">{t('home.media')}</h3>
+                <ListEditor rows={(sh.mediaPlayers ?? []) as Row[]} domains={['media_player']} options={options} t={t}
+                  onChange={(rows) => upSh((s) => { s.mediaPlayers = rows.filter((r) => r.entity) as NamedEntity[] })} />
                 <h3 className="ed-subtitle">{t('home.security')}</h3>
                 <ListEditor rows={(sh.locks ?? []) as Row[]} domains={['lock']} options={options} t={t}
                   onChange={(rows) => upSh((s) => { s.locks = rows.filter((r) => r.entity) as NamedEntity[] })} />

@@ -45,6 +45,7 @@ export interface SmartHomeCfg {
   sensors?: NamedEntity[]
   lights?: NamedEntity[]
   locks?: NamedEntity[]
+  mediaPlayers?: NamedEntity[]
   alarm?: string
 }
 

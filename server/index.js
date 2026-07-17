@@ -8,6 +8,7 @@ import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { mockRouter } from './mock.js'
+import { validateConfig } from './validate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.PORT || 8090)
@@ -169,48 +170,6 @@ app.get('/api/meta', (req, res) => res.json({
   editorEnabled: EDITOR_ENABLED, mock: MOCK, authEnabled: AUTH_ENABLED, user: sessionUser(req),
 }))
 
-const isNamedRows = (v) =>
-  v === undefined ||
-  (Array.isArray(v) && v.every((r) => r && typeof r === 'object' && typeof r.name === 'string' &&
-    (r.entity === null || r.entity === undefined || typeof r.entity === 'string')))
-
-function validateConfig(c) {
-  if (!c || typeof c !== 'object' || Array.isArray(c)) return 'config must be a JSON object'
-  if (typeof c.weatherEntity !== 'string' || !c.weatherEntity) return 'weatherEntity must be a non-empty string'
-  for (const k of ['calendars', 'tasks', 'meals', 'lists', 'rewards']) {
-    if (k === 'calendars') {
-      if (!Array.isArray(c.calendars) || !c.calendars.every((r) => r && typeof r.entity === 'string')) {
-        return 'calendars must be an array of { entity, name?, color }'
-      }
-    } else if (!isNamedRows(c[k])) return `${k} must be an array of { name, entity }`
-  }
-  if (c.smartHome !== undefined) {
-    const sh = c.smartHome
-    if (!sh || typeof sh !== 'object' || Array.isArray(sh)) return 'smartHome must be an object'
-    for (const k of ['cameras', 'sensors', 'lights', 'locks']) {
-      if (!isNamedRows(sh[k])) return `smartHome.${k} must be an array of { name, entity }`
-    }
-  }
-  if (c.garbage !== undefined && !isNamedRows(c.garbage)) {
-    return 'garbage must be an array of { name, entity, color }'
-  }
-  if (c.airQuality !== undefined && c.airQuality !== null) {
-    const a = c.airQuality
-    if (typeof a !== 'object' || Array.isArray(a) || typeof a.entity !== 'string') {
-      return 'airQuality must be an object with an entity string'
-    }
-  }
-  if (c.dashboard !== undefined) {
-    const d = c.dashboard
-    if (!d || typeof d !== 'object' || Array.isArray(d)) return 'dashboard must be an object'
-    if (!Array.isArray(d.tiles)) return 'dashboard.tiles must be an array'
-    const ok = d.tiles.every((tile) => tile && typeof tile.id === 'string' &&
-      ['x', 'y', 'w', 'h'].every((f) => Number.isFinite(tile[f])))
-    if (!ok) return 'dashboard.tiles items must be { id, x, y, w, h }'
-  }
-  return null
-}
-
 app.put('/api/config', (req, res) => {
   if (!EDITOR_ENABLED) return res.status(403).json({ error: 'editor disabled (EDITOR_ENABLED=0)' })
   const err = validateConfig(req.body)
@@ -329,6 +288,16 @@ setInterval(() => {
   }
 }, 15_000)
 
+// don't orphan ffmpeg children when the server itself stops (docker stop, ^C)
+const killAllCams = () => {
+  for (const cam of cams.values()) { try { cam.proc.kill('SIGKILL') } catch { /* already gone */ } }
+  cams.clear()
+}
+process.on('exit', killAllCams)
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => { killAllCams(); process.exit(0) })
+}
+
 // serve the ffmpeg-generated HLS files (gated by the /api requireAuth above)
 app.get('/api/camstream/:entity/:file', (req, res) => {
   const { entity, file } = req.params
@@ -353,7 +322,7 @@ app.get('/api/camera/:entity/stream', async (req, res) => {
   const rtsp = rtspForEntity(entity)
   if (rtsp) {
     try {
-      const cam = startCam(entity, rtsp)
+      startCam(entity, rtsp)
       const ready = await waitForPlaylist(camDir(entity), 12_000)
       if (ready) return res.json({ url: `/api/camstream/${entity}/index.m3u8`, direct: true })
       console.warn(`[homeboard] direct RTSP for ${entity} not ready — falling back to HA`)

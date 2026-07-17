@@ -3,7 +3,7 @@ import Hls from 'hls.js'
 import { useStore } from '../store'
 import { getCameraStream } from '../api'
 import type { NamedEntity } from '../types'
-import { BulbIcon, LockIcon, ShieldIcon, CameraIcon, ThermoIcon, PoolIcon, AirIcon, SunIcon } from '../icons'
+import { BulbIcon, LockIcon, ShieldIcon, CameraIcon, ThermoIcon, PoolIcon, AirIcon, SunIcon, MusicIcon, PlayIcon, PauseIcon, PrevTrackIcon, NextTrackIcon, SpeakerIcon } from '../icons'
 
 const num = (v: unknown): number | null => {
   const n = Number(v)
@@ -224,6 +224,71 @@ function LightsCard({ lights }: { lights: NamedEntity[] }) {
   )
 }
 
+function MediaCard({ players }: { players: NamedEntity[] }) {
+  const { entityStates, callService, t } = useStore()
+  // volume being dragged, per player — shown immediately, committed on release
+  const [dragVol, setDragVol] = useState<Record<string, number>>({})
+
+  const commitVol = async (entity: string) => {
+    const v = dragVol[entity]
+    if (v == null) return
+    await callService('media_player', 'volume_set', { entity_id: entity, volume_level: v / 100 })
+    setDragVol((d) => Object.fromEntries(Object.entries(d).filter(([k]) => k !== entity)))
+  }
+
+  return (
+    <section className="card sh-media">
+      <h2 className="card-title">{t('home.media')}</h2>
+      <div className="sh-media-rows">
+        {players.map((p) => {
+          const st = entityStates[p.entity]
+          const off = !st || st.state === 'off' || st.state === 'unavailable'
+          const playing = st?.state === 'playing'
+          const title = [st?.attributes?.media_title, st?.attributes?.media_artist]
+            .filter(Boolean).join(' — ')
+          const volRaw = num(st?.attributes?.volume_level)
+          const vol = dragVol[p.entity] ?? (volRaw != null ? Math.round(volRaw * 100) : null)
+          return (
+            <div className={`sh-media-row${playing ? ' playing' : ''}`} key={p.entity}>
+              <span className="sh-media-icon"><MusicIcon /></span>
+              <span className="sh-media-info">
+                <b>{p.name}</b>
+                <small>{off ? t('state.unavailable') : title || t('media.nothing')}</small>
+              </span>
+              <span className="sh-media-controls">
+                <button aria-label={t('media.previous')} disabled={off}
+                  onClick={() => callService('media_player', 'media_previous_track', { entity_id: p.entity })}>
+                  <PrevTrackIcon size={18} />
+                </button>
+                <button className="sh-media-play" aria-label={t('media.playPause')} disabled={off}
+                  onClick={() => callService('media_player', 'media_play_pause', { entity_id: p.entity })}>
+                  {playing ? <PauseIcon size={20} /> : <PlayIcon size={20} />}
+                </button>
+                <button aria-label={t('media.next')} disabled={off}
+                  onClick={() => callService('media_player', 'media_next_track', { entity_id: p.entity })}>
+                  <NextTrackIcon size={18} />
+                </button>
+              </span>
+              {vol != null && (
+                <span className="sh-media-volume">
+                  <SpeakerIcon size={17} />
+                  <input
+                    type="range" min={0} max={100} value={vol} disabled={off}
+                    aria-label={t('media.volume')}
+                    onChange={(e) => setDragVol((d) => ({ ...d, [p.entity]: Number(e.target.value) }))}
+                    onPointerUp={() => commitVol(p.entity)}
+                    onKeyUp={() => commitVol(p.entity)}
+                  />
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 function SecurityCard({ locks, alarm }: { locks: NamedEntity[]; alarm?: string }) {
   const { entityStates, callService, t } = useStore()
   const confirm = useConfirm()
@@ -282,7 +347,7 @@ function SecurityCard({ locks, alarm }: { locks: NamedEntity[]; alarm?: string }
 export function SmartHomePage() {
   const { config, t } = useStore()
   const sh = config?.smartHome
-  if (!sh || (!sh.climate && !sh.cameras?.length && !sh.sensors?.length && !sh.lights?.length && !sh.locks?.length && !sh.alarm)) {
+  if (!sh || (!sh.climate && !sh.cameras?.length && !sh.sensors?.length && !sh.lights?.length && !sh.locks?.length && !sh.mediaPlayers?.length && !sh.alarm)) {
     return <div className="card page-card"><p className="cal-empty">{t('home.notConfigured')}</p></div>
   }
 
@@ -292,6 +357,7 @@ export function SmartHomePage() {
       {!!sh.cameras?.length && <CameraCard cameras={sh.cameras} />}
       {!!sh.sensors?.length && <SensorsCard sensors={sh.sensors} />}
       {!!sh.lights?.length && <LightsCard lights={sh.lights} />}
+      {!!sh.mediaPlayers?.length && <MediaCard players={sh.mediaPlayers} />}
       {(!!sh.locks?.length || sh.alarm) && <SecurityCard locks={sh.locks ?? []} alarm={sh.alarm} />}
     </div>
   )
