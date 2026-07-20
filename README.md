@@ -105,6 +105,11 @@ Mounted as a volume. Two ways to edit:
   follows HA's `sun.sun`); a device-level choice made with the top-bar toggle or
   Settings overrides it
 
+## Preview
+
+<img width="3024" height="1724" alt="image" src="https://github.com/user-attachments/assets/0d4f500d-f985-4dfe-a8dd-cf9ab5a1bb69" />
+
+
 ## Translations
 
 UI strings live in `src/i18n/<lang>.json` (flat keys, `{var}` interpolation,
