@@ -219,17 +219,6 @@ export function mockRouter() {
   })
 
   // ---- smart home ----
-  r.get('/camera_proxy/:id', (_req, res) => {
-    res.type('image/svg+xml').send(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
-        <rect width="640" height="360" fill="#2b3440"/>
-        <circle cx="320" cy="150" r="46" fill="none" stroke="#5b6b7d" stroke-width="8"/>
-        <circle cx="320" cy="150" r="18" fill="#5b6b7d"/>
-        <text x="320" y="260" fill="#8fa0b3" font-family="sans-serif" font-size="26" text-anchor="middle">Mock camera — ${new Date().toLocaleTimeString()}</text>
-      </svg>`,
-    )
-  })
-
   r.post('/services/light/:svc', (req, res) => {
     for (const id of [].concat(req.body?.entity_id ?? [])) {
       if (live[id]) live[id].state = req.params.svc === 'turn_on' ? 'on' : req.params.svc === 'turn_off' ? 'off' : live[id].state === 'on' ? 'off' : 'on'

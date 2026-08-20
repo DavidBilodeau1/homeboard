@@ -28,9 +28,6 @@
   "photos": { "intervalSeconds": 15 },
   "smartHome": {
     "climate": "climate.thermostat",
-    "cameras": [
-      { "name": "Front door", "entity": "camera.front_door", "zoomEntity": "camera.front_door_hd", "rtsp": "rtsp://user:pass@CAMERA_IP:554/stream_sub", "rtspZoom": "rtsp://user:pass@CAMERA_IP:554/stream_main" }
-    ],
     "sensors": [
       { "name": "Pool", "entity": "sensor.pool_temperature", "icon": "pool" },
       { "name": "Air quality", "entity": "sensor.air_quality_index", "icon": "air" },
@@ -49,6 +46,12 @@
       { "name": "Kitchen", "entity": "media_player.kitchen" }
     ],
     "alarm": "alarm_control_panel.home_alarm"
+  },
+  "frigate": {
+    "cameras": ["front_door", "driveway", "backyard"],
+    "refreshSeconds": 8,
+    "pollSeconds": 15,
+    "alertLimit": 20
   },
   "dashboard": {
     "cols": 12,

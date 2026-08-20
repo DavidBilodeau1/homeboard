@@ -32,21 +32,28 @@ export interface NamedEntity {
   name: string
   entity: string
   icon?: string
-  /** cameras: higher-resolution entity used for the fullscreen overlay */
-  zoomEntity?: string
-  /** cameras: RTSP URL to stream directly (bypassing HA); rtspZoom = fullscreen */
-  rtsp?: string
-  rtspZoom?: string
 }
 
 export interface SmartHomeCfg {
   climate?: string
-  cameras?: NamedEntity[]
   sensors?: NamedEntity[]
   lights?: NamedEntity[]
   locks?: NamedEntity[]
   mediaPlayers?: NamedEntity[]
   alarm?: string
+}
+
+/** Frigate NVR. Cameras are discovered from Frigate itself; this only tunes
+ *  which ones to show and how hard to poll. */
+export interface FrigateCfg {
+  /** camera names to show, in this order; omit to show every enabled camera */
+  cameras?: string[]
+  /** snapshot refresh cadence on the camera wall (seconds) */
+  refreshSeconds?: number
+  /** how often to re-poll alerts, detections and health (seconds) */
+  pollSeconds?: number
+  /** how many review items to keep in the alerts feed */
+  alertLimit?: number
 }
 
 export interface EntityState {
@@ -155,6 +162,7 @@ export interface AppConfig {
   people?: string[]
   photos?: { intervalSeconds?: number }
   smartHome?: SmartHomeCfg
+  frigate?: FrigateCfg
   dashboard?: DashboardLayout
   garbage?: GarbageCfg[]
   airQuality?: AirQualityCfg

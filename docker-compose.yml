@@ -1,7 +1,15 @@
 services:
   homeboard:
+    # Published by .github/workflows/docker-publish.yml on every `v*` tag, which
+    # is what Watchtower follows — so a release rolls out on its own. `build: .`
+    # stays as a fallback: compose builds from source if the pull fails, and
+    # `docker compose up -d --build` still forces a local build.
+    image: ghcr.io/davidbilodeau1/homeboard:latest
     build: .
     container_name: homeboard
+    labels:
+      # only needed if your Watchtower runs with WATCHTOWER_LABEL_ENABLE=true
+      - com.centurylinklabs.watchtower.enable=true
     ports:
       - "8090:8090"
     environment:
@@ -10,6 +18,11 @@ services:
       IMMICH_URL: ${IMMICH_URL:-}
       IMMICH_API_KEY: ${IMMICH_API_KEY:-}
       IMMICH_ALBUM: ${IMMICH_ALBUM:-Wallpanel}
+      # Frigate NVR (optional): snapshots, alerts, health on the Cameras page
+      FRIGATE_URL: ${FRIGATE_URL:-}
+      FRIGATE_USER: ${FRIGATE_USER:-}
+      FRIGATE_PASSWORD: ${FRIGATE_PASSWORD:-}
+      FRIGATE_TOKEN: ${FRIGATE_TOKEN:-}
       # Set to 0 to make the Settings config editor read-only (wall-panel mode)
       EDITOR_ENABLED: ${EDITOR_ENABLED:-1}
       # "Log in with Home Assistant": set PUBLIC_URL to HomeBoard's externally

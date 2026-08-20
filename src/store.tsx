@@ -57,7 +57,6 @@ const smartHomeEntities = (cfg: AppConfig | null): string[] => {
   return [
     sh.climate,
     sh.alarm,
-    ...(sh.cameras ?? []).map((c) => c.entity),
     ...(sh.sensors ?? []).map((s) => s.entity),
     ...(sh.lights ?? []).map((l) => l.entity),
     ...(sh.locks ?? []).map((l) => l.entity),

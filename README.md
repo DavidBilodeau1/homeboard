@@ -12,21 +12,28 @@ browser) and receives instant updates over the HA WebSocket API.
 - **Calendar** — full month view with colored event chips per HA calendar
 - **Tasks / Lists / Meals** — HA `todo` lists: check off, add, delete items
 - **Rewards** — HA `counter` helpers with +/− buttons
+- **Cameras** — a [Frigate](https://frigate.video) wall: auto-refreshing
+  snapshots with an hour of motion activity under each, an alerts feed you can
+  acknowledge, live MJPEG + timelapse recap + event clips in one tap, and
+  detector/storage/uptime health at a glance
 - **Photos** — fullscreen slideshow from a mounted folder
 - Live updates via WebSocket (state changes appear within ~1s), 5-min polling
   fallback, full refresh on reconnect after an outage
 - **PWA** — installable from the browser ("Add to Home Screen") for a
   chrome-less fullscreen app on tablets and phones
-- **Mock mode** — runs with demo data when `HA_URL`/`HA_TOKEN` are not set
+- **Mock mode** — runs with demo data (including four fake Frigate cameras with
+  alerts and health) when `HA_URL`/`HA_TOKEN` are not set
 
 ## Quick start (Docker)
 
 ```bash
 cp .env.example .env             # then paste your HA long-lived access token
 cp config/config.example.json config/config.json   # then edit for your entities
-docker compose up -d --build
+docker compose up -d            # pulls ghcr.io/davidbilodeau1/homeboard:latest
 # open http://<server>:8090
 ```
+
+Add `--build` to build from source instead of pulling the published image.
 
 Get a token in HA: click your user (bottom-left) → **Security** →
 **Long-lived access tokens** → *Create token*.
@@ -44,6 +51,10 @@ Get a token in HA: click your user (bottom-left) → **Security** →
 | `IMMICH_URL` | — | Immich base URL, e.g. `https://photos.example.com` |
 | `IMMICH_API_KEY` | — | Immich API key (Account Settings → API Keys) |
 | `IMMICH_ALBUM` | `Wallpanel` | Immich album name to use for the slideshow |
+| `FRIGATE_URL` | — | Frigate base URL, e.g. `http://frigate.local:5000` |
+| `FRIGATE_USER` | — | Frigate username (only if Frigate's own auth is on) |
+| `FRIGATE_PASSWORD` | — | Frigate password |
+| `FRIGATE_TOKEN` | — | JWT instead of user/password |
 | `EDITOR_ENABLED` | `1` | `0` makes the Settings config editor read-only |
 | `PUBLIC_URL` | — | HomeBoard's own external URL; **setting it enables login** |
 | `AUTH_ENABLED` | auto | `0` forces auth off even when `PUBLIC_URL` is set |
@@ -111,6 +122,46 @@ Mounted as a volume. Two ways to edit:
   follows HA's `sun.sun`); a device-level choice made with the top-bar toggle or
   Settings overrides it
 
+## Cameras (Frigate)
+
+Set `FRIGATE_URL` and the **Cameras** page comes alive — no camera list to
+maintain, since HomeBoard reads Frigate's own config. If Frigate's built-in
+authentication is enabled, add `FRIGATE_USER`/`FRIGATE_PASSWORD` (HomeBoard logs
+in once and refreshes the token by itself) or paste a `FRIGATE_TOKEN`.
+
+What the page shows:
+
+- **Camera wall** — `latest.jpg` snapshots refreshed every few seconds (cheap:
+  no transcoding, no ffmpeg), each with the last hour of motion activity drawn
+  as a sparkline, an unread-alert badge, and the newest detection with its label
+- **Alerts feed** — Frigate *review items*, newest first, unread marked; hover
+  plays the animated preview; one tap acknowledges it (`POST /reviews/viewed`)
+- **Health strip** — new/24 h alert and detection counts, cameras up, detector
+  inference time, recordings disk usage, uptime and version (with an update hint)
+- **Tap a camera** — fullscreen live MJPEG with Frigate's own bounding boxes,
+  zones and timestamp burnt in; a **Last 30 min** timelapse (`preview.mp4`); and
+  a strip of recent events whose clips play in place
+
+Tuning lives under `frigate` in `config/config.json` (or Settings → Cameras):
+
+```json
+"frigate": {
+  "cameras": ["front_door", "driveway"],
+  "refreshSeconds": 8,
+  "pollSeconds": 15,
+  "alertLimit": 20
+}
+```
+
+Omit `cameras` to show every camera Frigate has enabled; list them to pick and
+order the wall. `refreshSeconds` is the snapshot cadence, `pollSeconds` how often
+alerts/health are re-fetched, `alertLimit` how deep the feed goes.
+
+Nothing reaches Frigate from the browser: images, clips and JSON all travel
+through `/api/frigate/*`, which allow-lists exactly the media paths the UI needs
+(`latest.jpg`, event snapshots/thumbnails/clips, review previews, `preview.mp4`,
+the MJPEG feed) and validates every camera name against Frigate's real list.
+
 ## Preview
 
 <img width="3024" height="1724" alt="image" src="https://github.com/user-attachments/assets/0d4f500d-f985-4dfe-a8dd-cf9ab5a1bb69" />
@@ -150,6 +201,34 @@ npm run icons          # regenerate the PWA icons in public/icons/
 
 CI (GitHub Actions) runs typecheck, lint, tests and the build on every push/PR.
 
+## Releases & automatic updates
+
+[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)
+builds `ghcr.io/davidbilodeau1/homeboard` (linux/amd64) and tags it by trigger:
+
+| Trigger | Tags pushed | Effect on the server |
+| --- | --- | --- |
+| push to `main` | `edge`, `sha-<short>` | nothing moves |
+| push of a `v*` tag | `latest`, `1.2.3`, `1.2` | Watchtower rolls it out |
+
+So cutting a release is:
+
+```bash
+npm version minor -m 'release %s'   # bumps package.json and creates the tag
+git push && git push --tags
+```
+
+`docker-compose.yml` tracks `:latest`, so a **Watchtower** container on the
+server pulls the new image and recreates HomeBoard on its next check — no manual
+deploy step. The compose file also carries
+`com.centurylinklabs.watchtower.enable=true`, which only matters if your
+Watchtower runs with `WATCHTOWER_LABEL_ENABLE=true`.
+
+> If the GHCR package is private, run `docker login ghcr.io` on the server with a
+> PAT that has `read:packages` (Watchtower reuses the host's Docker
+> credentials), or make the package public: GitHub → Packages → homeboard →
+> Package settings → Change visibility.
+
 To develop against your real HA instance:
 
 ```bash
@@ -159,8 +238,9 @@ HA_URL=https://ha.example.com HA_TOKEN=xxx npm run start
 ## Architecture
 
 ```
-browser ── SPA (React/Vite) ── /api/ha/* ──► Node/Express proxy ──► HA REST API
-        └───────── /ws ◄──────────────────── WebSocket bridge ◄─── HA WebSocket API
+browser ── SPA (React/Vite) ── /api/ha/*      ──► Node/Express proxy ──► HA REST API
+        │                     /api/frigate/* ──► Frigate proxy      ──► Frigate API
+        └───────── /ws ◄──────────────────────── WebSocket bridge ◄─── HA WebSocket API
 ```
 
 The proxy adds the `Authorization: Bearer` header server-side, so the token is

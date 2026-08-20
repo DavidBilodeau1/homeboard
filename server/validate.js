@@ -19,8 +19,18 @@ export function validateConfig(c) {
   if (c.smartHome !== undefined) {
     const sh = c.smartHome
     if (!sh || typeof sh !== 'object' || Array.isArray(sh)) return 'smartHome must be an object'
-    for (const k of ['cameras', 'sensors', 'lights', 'locks', 'mediaPlayers']) {
+    for (const k of ['sensors', 'lights', 'locks', 'mediaPlayers']) {
       if (!isNamedRows(sh[k])) return `smartHome.${k} must be an array of { name, entity }`
+    }
+  }
+  if (c.frigate !== undefined && c.frigate !== null) {
+    const f = c.frigate
+    if (typeof f !== 'object' || Array.isArray(f)) return 'frigate must be an object'
+    if (f.cameras !== undefined && !(Array.isArray(f.cameras) && f.cameras.every((n) => typeof n === 'string'))) {
+      return 'frigate.cameras must be an array of Frigate camera names'
+    }
+    for (const k of ['refreshSeconds', 'pollSeconds', 'alertLimit']) {
+      if (f[k] !== undefined && !(Number.isFinite(f[k]) && f[k] > 0)) return `frigate.${k} must be a positive number`
     }
   }
   if (c.garbage !== undefined && !isNamedRows(c.garbage)) {

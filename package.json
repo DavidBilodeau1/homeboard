@@ -1,6 +1,6 @@
 {
   "name": "homeboard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "express": "^4.21.2",
-    "hls.js": "^1.6.16",
     "react-grid-layout": "^1.5.3",
     "ws": "^8.18.0"
   },

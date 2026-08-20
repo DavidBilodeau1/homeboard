@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { haGet } from '../api'
-import { availableLanguages } from '../i18n'
+import { availableLanguages, type Translate } from '../i18n'
+import { getFrigateState } from '../frigate'
 import type { AppConfig, NamedEntity, ThemeMode } from '../types'
 
 const THEME_OPTIONS: { id: ThemeMode; labelKey: string }[] = [
@@ -95,11 +96,42 @@ function ListEditor({ rows, onChange, domains, options, withColor, withIcon, t }
   )
 }
 
+/** Ticks cameras discovered from Frigate; tick order is display order. */
+function FrigateCameraPicker({
+  selected, t, onChange,
+}: { selected: string[]; t: Translate; onChange: (names: string[]) => void }) {
+  const [cams, setCams] = useState<{ name: string; label: string }[] | null>(null)
+  useEffect(() => {
+    getFrigateState().then((s) => setCams(s.cameras ?? [])).catch(() => setCams([]))
+  }, [])
+
+  if (!cams) return <p className="settings-note" style={{ margin: 0 }}>{t('frigate.loading')}</p>
+  if (!cams.length) return <p className="settings-note" style={{ margin: 0 }}>{t('settings.frigateNone')}</p>
+
+  const toggle = (name: string) =>
+    onChange(selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name])
+
+  return (
+    <div className="ed-checks">
+      {cams.map((c) => {
+        const i = selected.indexOf(c.name)
+        return (
+          <label key={c.name} className={`ed-check${i >= 0 ? ' on' : ''}`}>
+            <input type="checkbox" checked={i >= 0} onChange={() => toggle(c.name)} />
+            <span>{c.label}</span>
+            {i >= 0 && <em>{i + 1}</em>}
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="ed-field"><span>{label}</span>{children}</label>
 }
 
-const TABS = ['general', 'calendars', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'garbage', 'air', 'json'] as const
+const TABS = ['general', 'calendars', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'frigate', 'garbage', 'air', 'json'] as const
 type Tab = (typeof TABS)[number]
 
 export function SettingsPage() {
@@ -118,7 +150,8 @@ export function SettingsPage() {
   const tabLabel: Record<Tab, string> = useMemo(() => ({
     general: t('settings.general'), calendars: t('nav.calendar'), tasks: t('nav.tasks'),
     meals: t('nav.meals'), lists: t('nav.lists'), rewards: t('nav.rewards'),
-    smarthome: t('nav.home'), garbage: t('settings.garbage'), air: t('settings.air'), json: t('settings.json'),
+    smarthome: t('nav.home'), frigate: t('settings.frigate'),
+    garbage: t('settings.garbage'), air: t('settings.air'), json: t('settings.json'),
   }), [t])
 
   if (!draft) return <div className="card page-card settings-page"><h2 className="card-title">{t('settings.title')}</h2></div>
@@ -127,6 +160,7 @@ export function SettingsPage() {
   const up = (fn: (d: AppConfig) => void) => setDraft((d) => { const c = structuredClone(d!); fn(c); return c })
   const sh = draft.smartHome ?? {}
   const upSh = (fn: (s: NonNullable<AppConfig['smartHome']>) => void) => up((d) => { d.smartHome = d.smartHome ?? {}; fn(d.smartHome) })
+  const upFg = (fn: (f: NonNullable<AppConfig['frigate']>) => void) => up((d) => { d.frigate = d.frigate ?? {}; fn(d.frigate) })
 
   const save = async () => {
     let body: unknown = draft
@@ -264,9 +298,6 @@ export function SettingsPage() {
                   <EntitySelect value={sh.alarm} domains={['alarm_control_panel']} options={options} noneLabel={t('settings.none')}
                     onChange={(v) => upSh((s) => { s.alarm = v ?? undefined })} />
                 </Field>
-                <h3 className="ed-subtitle">{t('home.cameras')}</h3>
-                <ListEditor rows={(sh.cameras ?? []) as Row[]} domains={['camera']} options={options} t={t}
-                  onChange={(rows) => upSh((s) => { s.cameras = rows.filter((r) => r.entity) as NamedEntity[] })} />
                 <h3 className="ed-subtitle">{t('home.sensors')}</h3>
                 <ListEditor rows={(sh.sensors ?? []) as Row[]} domains={['sensor']} options={options} withIcon t={t}
                   onChange={(rows) => upSh((s) => { s.sensors = rows.filter((r) => r.entity) as NamedEntity[] })} />
@@ -279,6 +310,29 @@ export function SettingsPage() {
                 <h3 className="ed-subtitle">{t('home.security')}</h3>
                 <ListEditor rows={(sh.locks ?? []) as Row[]} domains={['lock']} options={options} t={t}
                   onChange={(rows) => upSh((s) => { s.locks = rows.filter((r) => r.entity) as NamedEntity[] })} />
+              </div>
+            )}
+
+            {tab === 'frigate' && (
+              <div className="ed-fields">
+                <p className="settings-note" style={{ margin: 0 }}>{t('settings.frigateHint')}</p>
+                <FrigateCameraPicker
+                  selected={draft.frigate?.cameras ?? []}
+                  t={t}
+                  onChange={(names) => upFg((f) => { f.cameras = names.length ? names : undefined })}
+                />
+                <Field label={t('settings.frigateRefresh')}>
+                  <input type="number" min={2} max={120} value={draft.frigate?.refreshSeconds ?? 8}
+                    onChange={(e) => upFg((f) => { f.refreshSeconds = Number(e.target.value) || undefined })} />
+                </Field>
+                <Field label={t('settings.frigatePoll')}>
+                  <input type="number" min={5} max={300} value={draft.frigate?.pollSeconds ?? 15}
+                    onChange={(e) => upFg((f) => { f.pollSeconds = Number(e.target.value) || undefined })} />
+                </Field>
+                <Field label={t('settings.frigateAlerts')}>
+                  <input type="number" min={5} max={100} value={draft.frigate?.alertLimit ?? 20}
+                    onChange={(e) => upFg((f) => { f.alertLimit = Number(e.target.value) || undefined })} />
+                </Field>
               </div>
             )}
 

@@ -58,4 +58,22 @@ describe('validateConfig', () => {
     c.someFutureFeature = { anything: true }
     expect(validateConfig(c)).toBeNull()
   })
+
+  it('accepts a frigate section with camera names', () => {
+    const c = example()
+    c.frigate = { cameras: ['front_door'], refreshSeconds: 5 }
+    expect(validateConfig(c)).toBeNull()
+  })
+
+  it('rejects a frigate camera list that is not strings', () => {
+    const c = example()
+    c.frigate = { cameras: [{ name: 'front_door' }] }
+    expect(validateConfig(c)).toMatch(/frigate.cameras/)
+  })
+
+  it('rejects non-positive frigate intervals', () => {
+    const c = example()
+    c.frigate = { pollSeconds: 0 }
+    expect(validateConfig(c)).toMatch(/pollSeconds/)
+  })
 })

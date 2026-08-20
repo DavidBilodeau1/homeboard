@@ -65,12 +65,4 @@ export const counterAdjust = (entity: string, dir: 'increment' | 'decrement') =>
 export const callService = (domain: string, service: string, data: Record<string, unknown>) =>
   haPost(`services/${domain}/${service}`, data)
 
-/** Camera snapshot through the proxy; `bust` forces a fresh frame. */
-export const cameraUrl = (entity: string, bust: number) =>
-  `/api/ha/camera_proxy/${entity}?t=${bust}`
-
-/** Mint an HLS playlist URL (proxied) for a camera's live stream. */
-export const getCameraStream = (entity: string): Promise<{ url: string }> =>
-  fetch(`/api/camera/${entity}/stream`).then(json)
-
 export const getPhotos = (): Promise<string[]> => fetch('/api/photos').then(json).catch(() => [])

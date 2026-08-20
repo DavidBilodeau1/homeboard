@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import Hls from 'hls.js'
 import { useStore } from '../store'
-import { getCameraStream } from '../api'
+import { useFrigate } from '../frigate'
+import { FrigateMini } from '../components/FrigateTiles'
 import type { NamedEntity } from '../types'
-import { BulbIcon, LockIcon, ShieldIcon, CameraIcon, ThermoIcon, PoolIcon, AirIcon, SunIcon, MusicIcon, PlayIcon, PauseIcon, PrevTrackIcon, NextTrackIcon, SpeakerIcon } from '../icons'
+import { BulbIcon, LockIcon, ShieldIcon, ThermoIcon, PoolIcon, AirIcon, SunIcon, MusicIcon, PlayIcon, PauseIcon, PrevTrackIcon, NextTrackIcon, SpeakerIcon } from '../icons'
 
 const num = (v: unknown): number | null => {
   const n = Number(v)
@@ -71,98 +71,6 @@ function ClimateCard({ entity }: { entity: string }) {
           </button>
         ))}
       </div>
-    </section>
-  )
-}
-
-/** Live HLS video for one camera. Mints a proxied playlist URL from the
- *  server, plays via hls.js (native HLS on Safari), and retries on stall. */
-function CameraStream({ entity, muted = true }: { entity: string; muted?: boolean }) {
-  const { t } = useStore()
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    let hls: Hls | null = null
-    let retry: ReturnType<typeof setTimeout>
-    const video = videoRef.current
-
-    const start = async () => {
-      if (cancelled || !video) return
-      try {
-        const { url } = await getCameraStream(entity)
-        if (cancelled) return
-        setFailed(false)
-        if (hls) { hls.destroy(); hls = null }
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          // Safari / native HLS
-          video.src = url
-          video.play().catch(() => {})
-        } else if (Hls.isSupported()) {
-          hls = new Hls({ liveDurationInfinity: true, backBufferLength: 10 })
-          hls.loadSource(url)
-          hls.attachMedia(video)
-          hls.on(Hls.Events.ERROR, (_e, data) => {
-            if (data.fatal && !cancelled) {
-              hls?.destroy()
-              hls = null
-              retry = setTimeout(start, 4000) // stream idled out / dropped → re-mint
-            }
-          })
-        } else {
-          setFailed(true)
-        }
-      } catch {
-        if (!cancelled) {
-          setFailed(true)
-          retry = setTimeout(start, 6000)
-        }
-      }
-    }
-    start()
-
-    return () => {
-      cancelled = true
-      clearTimeout(retry)
-      hls?.destroy()
-    }
-  }, [entity])
-
-  return (
-    <>
-      <video ref={videoRef} autoPlay playsInline muted={muted} style={failed ? { visibility: 'hidden' } : undefined} />
-      {failed && (
-        <span className="sh-camera-off">
-          <CameraIcon size={30} />
-          {t('state.unavailable')}
-        </span>
-      )}
-    </>
-  )
-}
-
-function CameraCard({ cameras }: { cameras: NamedEntity[] }) {
-  const { t } = useStore()
-  const [zoomed, setZoomed] = useState<NamedEntity | null>(null)
-
-  return (
-    <section className="card sh-cameras">
-      <h2 className="card-title">{t('home.cameras')}</h2>
-      <div className="sh-camera-grid">
-        {cameras.map((c) => (
-          <button key={c.entity} className="sh-camera" onClick={() => setZoomed(c)}>
-            <CameraStream entity={c.entity} />
-            <span><CameraIcon size={14} /> {c.name}</span>
-          </button>
-        ))}
-      </div>
-      {zoomed && (
-        <div className="sh-camera-overlay" onClick={() => setZoomed(null)}>
-          <CameraStream entity={zoomed.zoomEntity ?? zoomed.entity} muted />
-          <span>{zoomed.name}</span>
-        </div>
-      )}
     </section>
   )
 }
@@ -347,14 +255,17 @@ function SecurityCard({ locks, alarm }: { locks: NamedEntity[]; alarm?: string }
 export function SmartHomePage() {
   const { config, t } = useStore()
   const sh = config?.smartHome
-  if (!sh || (!sh.climate && !sh.cameras?.length && !sh.sensors?.length && !sh.lights?.length && !sh.locks?.length && !sh.mediaPlayers?.length && !sh.alarm)) {
+  // one slow poll here — the wall of snapshots lives on the Cameras page
+  const { state: frigate } = useFrigate(30_000)
+  const hasCameras = !!frigate?.enabled && frigate.cameras.length > 0
+  if (!sh || (!sh.climate && !hasCameras && !sh.sensors?.length && !sh.lights?.length && !sh.locks?.length && !sh.mediaPlayers?.length && !sh.alarm)) {
     return <div className="card page-card"><p className="cal-empty">{t('home.notConfigured')}</p></div>
   }
 
   return (
     <div className="sh-grid">
       {sh.climate && <ClimateCard entity={sh.climate} />}
-      {!!sh.cameras?.length && <CameraCard cameras={sh.cameras} />}
+      {hasCameras && frigate && <FrigateMini state={frigate} />}
       {!!sh.sensors?.length && <SensorsCard sensors={sh.sensors} />}
       {!!sh.lights?.length && <LightsCard lights={sh.lights} />}
       {!!sh.mediaPlayers?.length && <MediaCard players={sh.mediaPlayers} />}
