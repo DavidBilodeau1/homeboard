@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useStore } from '../store'
-import { useFrigate, type FrigateAlert, type FrigateCamera, type FrigateState } from '../frigate'
+import { useFrigate, timeAgo, type FrigateAlert, type FrigateCamera, type FrigateState } from '../frigate'
 import {
   AlertsFeed, CameraFocus, CameraTile, FrigateEmpty, HealthStrip, type FocusTarget,
 } from '../components/FrigateTiles'
@@ -12,9 +12,9 @@ const orderCameras = (cams: FrigateCamera[], wanted?: string[]): FrigateCamera[]
 }
 
 export function CamerasPage() {
-  const { config, t } = useStore()
+  const { config, t, locale } = useStore()
   const cfg = config?.frigate
-  const { state, error, review } = useFrigate((cfg?.pollSeconds ?? 15) * 1000)
+  const { state, error, review, fetchedAt, stale } = useFrigate((cfg?.pollSeconds ?? 15) * 1000)
   const [focus, setFocus] = useState<FocusTarget | null>(null)
 
   const view = useMemo<FrigateState | null>(() => {
@@ -55,7 +55,13 @@ export function CamerasPage() {
   return (
     <div className="fg-page">
       <HealthStrip state={view} />
-      {error && <p className="fg-error">{error}</p>}
+      {(stale || error) && (
+        <p className="fg-error">
+          {stale && t('frigate.stale', { ago: timeAgo((fetchedAt ?? 0) / 1000, locale) })}
+          {stale && error ? ' · ' : ''}
+          {error}
+        </p>
+      )}
 
       <div className="fg-layout">
         <div className="fg-wall">

@@ -180,6 +180,7 @@
 
 
   "frigate.loading": "Connexion à Frigate…",
+  "frigate.stale": "Plus de rafraîchissement — dernière mise à jour {ago}.",
   "frigate.notConfigured": "Frigate n'est pas connecté",
   "frigate.notConfiguredHint": "Indiquez à HomeBoard l'adresse de votre instance Frigate pour voir les captures, les alertes et les détections ici.",
   "frigate.alerts": "Alertes",

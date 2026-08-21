@@ -180,6 +180,7 @@
 
 
   "frigate.loading": "Contacting Frigate…",
+  "frigate.stale": "Not refreshing — last update {ago}.",
   "frigate.notConfigured": "Frigate is not connected",
   "frigate.notConfiguredHint": "Point HomeBoard at your Frigate instance to see snapshots, alerts and detections here.",
   "frigate.alerts": "Alerts",

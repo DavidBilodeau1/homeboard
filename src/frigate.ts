@@ -79,22 +79,30 @@ export interface FrigateState {
   summary?: { alerts24h: number | null; detections24h: number | null; unreviewed: number }
   at?: number
   error?: string
+  /** parts of the payload Frigate refused, so a gap can't pass for "quiet" */
+  warnings?: string[]
 }
 
 // ---------- media URLs ----------
 const media = (p: string) => `/api/frigate/media/${p}`
 
-/** Freshest decoded frame. `bust` forces the browser to actually re-fetch. */
+/**
+ * Freshest decoded frame. `bust` forces the browser to actually re-fetch.
+ *
+ * The resize parameter is `height` — Frigate's old `h` was dropped when the API
+ * moved to FastAPI, and an unknown parameter is ignored rather than refused, so
+ * every tile was quietly pulling a full-resolution frame every few seconds.
+ */
 export const snapshotUrl = (camera: string, bust: number, height = 480) =>
-  media(`${camera}/latest.jpg?h=${height}&t=${bust}`)
+  media(`${camera}/latest.jpg?height=${height}&t=${bust}`)
 
 /** Live MJPEG feed, with Frigate's own detection overlays burnt in. */
 export const liveUrl = (camera: string, fps = 5, height = 720) =>
-  media(`${camera}?fps=${fps}&h=${height}&bbox=1&timestamp=1&zones=1`)
+  media(`${camera}?fps=${fps}&height=${height}&bbox=1&timestamp=1&zones=1`)
 
 export const eventThumbUrl = (id: string) => media(`events/${id}/thumbnail.jpg`)
 export const eventSnapshotUrl = (id: string, height = 720) =>
-  media(`events/${id}/snapshot.jpg?bbox=1&h=${height}`)
+  media(`events/${id}/snapshot.jpg?bbox=1&height=${height}`)
 export const eventClipUrl = (id: string) => media(`events/${id}/clip.mp4`)
 export const eventGifUrl = (id: string) => media(`events/${id}/preview.gif`)
 export const reviewPreviewUrl = (id: string) => media(`review/${id}/preview?format=gif`)
@@ -130,6 +138,12 @@ export const markReviewed = (ids: string[]): Promise<{ ok: boolean }> =>
 export function useFrigate(intervalMs = 15_000) {
   const [state, setState] = useState<FrigateState | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // A failed poll keeps the last payload on screen — which looks exactly like a
+  // quiet house. Remember when it last landed, and when we last tried, so the
+  // page can say otherwise. `polledAt` also guarantees a render per attempt:
+  // re-setting the same error string alone would not cause one.
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null)
+  const [polledAt, setPolledAt] = useState(0)
   const alive = useRef(true)
 
   const refresh = useCallback(async () => {
@@ -137,9 +151,12 @@ export function useFrigate(intervalMs = 15_000) {
       const s = await getFrigateState()
       if (!alive.current) return
       setState(s)
-      setError(s.error ?? null)
+      setError(s.error ?? s.warnings?.[0] ?? null)
+      setFetchedAt(Date.now())
     } catch (e) {
       if (alive.current) setError((e as Error).message)
+    } finally {
+      if (alive.current) setPolledAt(Date.now())
     }
   }, [])
 
@@ -163,7 +180,10 @@ export function useFrigate(intervalMs = 15_000) {
     refresh()
   }, [refresh])
 
-  return { state, error, refresh, review }
+  // two missed polls in a row: enough that a wall panel shouldn't be trusted
+  const stale = fetchedAt != null && polledAt - fetchedAt > intervalMs * 2.5
+
+  return { state, error, refresh, review, fetchedAt, stale }
 }
 
 // ---------- formatting ----------

@@ -64,7 +64,14 @@ async function fapi(path, init = {}, retried = false) {
 
 async function fjson(path) {
   const r = await fapi(path)
-  if (!r.ok) throw new Error(`Frigate ${path}: HTTP ${r.status}`)
+  if (!r.ok) {
+    // 401/403 with no user/password means the token can never be renewed, so
+    // say that rather than leaving a bare status code on the dashboard.
+    const hint = (r.status === 401 || r.status === 403) && !FRIGATE_USER
+      ? ' — set FRIGATE_USER/FRIGATE_PASSWORD so HomeBoard can renew its token'
+      : ''
+    throw new Error(`Frigate ${path}: HTTP ${r.status}${hint}`)
+  }
   return r.json()
 }
 
@@ -79,7 +86,31 @@ const secs = (v) => {
   return null
 }
 const uniq = (a) => [...new Set((a ?? []).filter(Boolean))]
+const arr = (v) => (Array.isArray(v) ? v : [])
 const mb2gb = (v) => (typeof v === 'number' ? Math.round((v / 1024) * 10) / 10 : null)
+
+/**
+ * Merge the two `reviewed` buckets into one feed: alerts ahead of plain
+ * detections, newest first — the order Frigate's own review list uses.
+ *
+ * Frigate flipped the meaning of `/review?reviewed=`: up to 0.15 any truthy
+ * value meant "don't filter out the ones already seen", from 0.16 (per-user
+ * review status) `1` means "ONLY the ones already seen". Asking for each bucket
+ * and merging is correct on either version, so a brand-new alert can never go
+ * missing. Review status is also per-user in 0.16, so what HomeBoard's Frigate
+ * account has seen is not what the browser session has seen — one more reason
+ * not to rely on that flag to decide what gets shown.
+ */
+const sevRank = (s) => (s === 'alert' ? 0 : 1)
+export function mergeReview(lists, limit) {
+  const byId = new Map()
+  for (const v of lists.flatMap(arr)) if (v?.id && !byId.has(v.id)) byId.set(v.id, v)
+  return [...byId.values()]
+    .sort((a, b) =>
+      sevRank(a.severity) - sevRank(b.severity) ||
+      (secs(b.start_time) ?? 0) - (secs(a.start_time) ?? 0))
+    .slice(0, limit)
+}
 
 /** Camera list straight from Frigate's own config — no duplication in ours. */
 let camCache = { at: 0, cams: [], version: null }
@@ -160,15 +191,20 @@ export function frigateRouter() {
     const eventLimit = Math.min(Number(req.query.events) || 24, 100)
     try {
       const { cams, version } = await discover()
-      const [review, events, stats, summary] = await Promise.all([
-        // reviewed=1 means "don't filter out the ones already seen"
-        fjson(`/review?limit=${alertLimit}&reviewed=1`).catch(() => []),
-        fjson(`/events?limit=${eventLimit}&has_snapshot=1`).catch(() => []),
-        fjson('/stats').catch(() => null),
-        fjson('/review/summary').catch(() => null),
+      // A part that fails must say so: swallowing it silently turned a 401 or a
+      // camera the Frigate role can't see into an empty, forever-stale feed.
+      const warnings = []
+      const soft = (path, fallback) =>
+        fjson(path).catch((e) => { warnings.push(e.message); return fallback })
+      const [unseen, seen, events, stats, summary] = await Promise.all([
+        soft(`/review?limit=${alertLimit}&reviewed=0`, []),
+        soft(`/review?limit=${alertLimit}&reviewed=1`, []),
+        soft(`/events?limit=${eventLimit}&has_snapshot=1`, []),
+        soft('/stats', null),
+        soft('/review/summary', null),
       ])
 
-      const alerts = (Array.isArray(review) ? review : []).map((v) => ({
+      const alerts = mergeReview([unseen, seen], alertLimit).map((v) => ({
         id: v.id,
         camera: v.camera,
         severity: v.severity,
@@ -183,7 +219,7 @@ export function frigateRouter() {
         detections: v.data?.detections ?? [],
       }))
 
-      const objects = (Array.isArray(events) ? events : []).map((e) => ({
+      const objects = arr(events).map((e) => ({
         id: e.id,
         camera: e.camera,
         label: e.label,
@@ -210,6 +246,7 @@ export function frigateRouter() {
           detections24h: last24.total_detection ?? null,
           unreviewed: alerts.filter((a) => !a.reviewed && a.severity === 'alert').length,
         },
+        warnings: uniq(warnings),
         at: Date.now(),
       })
     } catch (e) {
@@ -234,7 +271,7 @@ export function frigateRouter() {
         camera,
         after,
         before,
-        points: (Array.isArray(rows) ? rows : []).map((p) => Math.max(0, Number(p.motion) || 0)),
+        points: arr(rows).map((p) => Math.max(0, Number(p.motion) || 0)),
       })
     } catch (e) {
       res.status(502).json({ error: e.message })

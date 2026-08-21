@@ -80,7 +80,10 @@ interface TileProps {
 export function CameraTile({ camera, health, alerts, latest, refreshSeconds, showActivity = true, onOpen }: TileProps) {
   const { t, locale } = useStore()
   const bust = useBust(refreshSeconds)
-  const [broken, setBroken] = useState(false)
+  // Which refresh failed, rather than a sticky flag: one hiccup used to unmount
+  // the image for good, so the tile stayed dead until the page was reloaded.
+  const [failedBust, setFailedBust] = useState<number | null>(null)
+  const broken = failedBust === bust
   const motion = useMotion(camera.name, showActivity)
   const offline = health?.online === false
   const unread = alerts.length
@@ -92,8 +95,7 @@ export function CameraTile({ camera, health, alerts, latest, refreshSeconds, sho
           src={snapshotUrl(camera.name, bust)}
           alt={camera.label}
           loading="lazy"
-          onError={() => setBroken(true)}
-          onLoad={() => setBroken(false)}
+          onError={() => setFailedBust(bust)}
         />
       )}
       {(broken || offline) && (
