@@ -3,7 +3,8 @@ import { useStore } from '../store'
 import { haGet } from '../api'
 import { availableLanguages, type Translate } from '../i18n'
 import { getFrigateState } from '../frigate'
-import type { AppConfig, NamedEntity, ThemeMode } from '../types'
+import { calendarColor, getExpensaveCalendars } from '../expensave'
+import type { AppConfig, ExpensaveCalendar, ExpensaveCfg, NamedEntity, ThemeMode } from '../types'
 
 const THEME_OPTIONS: { id: ThemeMode; labelKey: string }[] = [
   { id: 'auto', labelKey: 'settings.themeAuto' },
@@ -127,11 +128,55 @@ function FrigateCameraPicker({
   )
 }
 
+/** Ticks the Expensave calendars to follow and picks each one's colour. */
+function ExpensaveCalendarPicker({ cfg, t, onChange }: {
+  cfg: ExpensaveCfg | undefined
+  t: Translate
+  onChange: (calendars: ExpensaveCfg['calendars']) => void
+}) {
+  const [cals, setCals] = useState<ExpensaveCalendar[] | null>(null)
+  useEffect(() => { getExpensaveCalendars().then(setCals).catch(() => setCals([])) }, [])
+
+  if (!cals) return <p className="settings-note" style={{ margin: 0 }}>{t('money.loading')}</p>
+  if (!cals.length) return <p className="settings-note" style={{ margin: 0 }}>{t('settings.expensaveNone')}</p>
+
+  const rows = cfg?.calendars ?? []
+  const toggle = (cal: ExpensaveCalendar, i: number) =>
+    onChange(rows.some((r) => r.id === cal.id)
+      ? rows.filter((r) => r.id !== cal.id)
+      : [...rows, { id: cal.id, name: cal.name, color: calendarColor(cfg, cal.id, i) }])
+
+  return (
+    <div className="ed-rows">
+      {cals.map((cal, i) => {
+        const row = rows.find((r) => r.id === cal.id)
+        return (
+          <div className="ed-row" key={cal.id}>
+            <label className={`ed-check${row ? ' on' : ''}`}>
+              <input type="checkbox" checked={!!row} onChange={() => toggle(cal, i)} />
+              <span>{cal.name}</span>
+            </label>
+            {row && (
+              <>
+                <input className="ed-input" value={row.name ?? ''} placeholder={cal.name}
+                  onChange={(e) => onChange(rows.map((r) => (r.id === cal.id ? { ...r, name: e.target.value } : r)))} />
+                <input type="color" className="ed-color" value={row.color ?? calendarColor(cfg, cal.id, i)}
+                  title={t('settings.color')}
+                  onChange={(e) => onChange(rows.map((r) => (r.id === cal.id ? { ...r, color: e.target.value } : r)))} />
+              </>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="ed-field"><span>{label}</span>{children}</label>
 }
 
-const TABS = ['general', 'calendars', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'frigate', 'garbage', 'air', 'json'] as const
+const TABS = ['general', 'calendars', 'money', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'frigate', 'garbage', 'air', 'json'] as const
 type Tab = (typeof TABS)[number]
 
 export function SettingsPage() {
@@ -148,7 +193,7 @@ export function SettingsPage() {
   useEffect(() => { if (tab === 'json' && draft) setJsonText(JSON.stringify(draft, null, 2)) }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const tabLabel: Record<Tab, string> = useMemo(() => ({
-    general: t('settings.general'), calendars: t('nav.calendar'), tasks: t('nav.tasks'),
+    general: t('settings.general'), calendars: t('nav.calendar'), money: t('settings.expensave'), tasks: t('nav.tasks'),
     meals: t('nav.meals'), lists: t('nav.lists'), rewards: t('nav.rewards'),
     smarthome: t('nav.home'), frigate: t('settings.frigate'),
     garbage: t('settings.garbage'), air: t('settings.air'), json: t('settings.json'),
@@ -161,6 +206,7 @@ export function SettingsPage() {
   const sh = draft.smartHome ?? {}
   const upSh = (fn: (s: NonNullable<AppConfig['smartHome']>) => void) => up((d) => { d.smartHome = d.smartHome ?? {}; fn(d.smartHome) })
   const upFg = (fn: (f: NonNullable<AppConfig['frigate']>) => void) => up((d) => { d.frigate = d.frigate ?? {}; fn(d.frigate) })
+  const upXp = (fn: (x: ExpensaveCfg) => void) => up((d) => { d.expensave = d.expensave ?? {}; fn(d.expensave) })
 
   const save = async () => {
     let body: unknown = draft
@@ -271,6 +317,37 @@ export function SettingsPage() {
               <ListEditor rows={draft.calendars as Row[]} domains={['calendar']} options={options} withColor t={t}
                 onChange={(rows) => up((d) => { d.calendars = rows.map((r) => ({ ...r, entity: r.entity ?? '', color: r.color ?? '#c33c54' })) })} />
             )}
+            {tab === 'money' && (
+              <div className="ed-fields">
+                <p className="settings-note" style={{ margin: 0 }}>{t('settings.expensaveHint')}</p>
+                <ExpensaveCalendarPicker
+                  cfg={draft.expensave}
+                  t={t}
+                  onChange={(calendars) => upXp((x) => { x.calendars = calendars?.length ? calendars : undefined })}
+                />
+                <Field label={t('settings.expensaveCurrency')}>
+                  <input className="ed-input" value={draft.expensave?.currency ?? ''} placeholder="CAD"
+                    onChange={(e) => upXp((x) => { x.currency = e.target.value || undefined })} />
+                </Field>
+                <Field label={t('settings.expensaveHorizon')}>
+                  <input className="ed-input" type="number" min={1} max={180} value={draft.expensave?.horizonDays ?? 14}
+                    onChange={(e) => upXp((x) => { x.horizonDays = Number(e.target.value) || undefined })} />
+                </Field>
+                <Field label={t('settings.expensaveBuffer')}>
+                  <input className="ed-input" type="number" min={0} step={50} value={draft.expensave?.buffer ?? 0}
+                    onChange={(e) => upXp((x) => { x.buffer = Number(e.target.value) || undefined })} />
+                </Field>
+                <Field label={t('settings.expensaveGoal')}>
+                  <input className="ed-input" type="number" min={0} step={25} value={draft.expensave?.weeklyGoal ?? ''}
+                    onChange={(e) => upXp((x) => { x.weeklyGoal = Number(e.target.value) || undefined })} />
+                </Field>
+                <Field label={t('settings.expensaveShow')}>
+                  <input type="checkbox" checked={draft.expensave?.showInCalendar ?? true}
+                    onChange={(e) => upXp((x) => { x.showInCalendar = e.target.checked ? undefined : false })} />
+                </Field>
+              </div>
+            )}
+
             {tab === 'tasks' && (
               <ListEditor rows={draft.tasks as Row[]} domains={['todo']} options={options} withColor t={t}
                 onChange={(rows) => up((d) => { d.tasks = rows })} />

@@ -53,6 +53,17 @@
     "pollSeconds": 15,
     "alertLimit": 20
   },
+  "expensave": {
+    "calendars": [
+      { "id": 1, "name": "Household", "color": "#2e9e8f" },
+      { "id": 2, "name": "Personal", "color": "#8e6cd6" }
+    ],
+    "currency": "CAD",
+    "horizonDays": 14,
+    "buffer": 500,
+    "weeklyGoal": 200,
+    "showInCalendar": true
+  },
   "dashboard": {
     "cols": 12,
     "rows": 9,

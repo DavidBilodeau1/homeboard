@@ -9,6 +9,10 @@
   --accent-soft: #f7dfe3;
   --line: #efe9e1;
   --radius: 18px;
+  --in: #2f8f5b;
+  --out: #c2453f;
+  --in-soft: #e4f2e9;
+  --out-soft: #f9e3e2;
 }
 
 [data-theme='dark'] {
@@ -21,6 +25,10 @@
   --accent: #e05a72;
   --accent-soft: #45262e;
   --line: #393341;
+  --in: #63c68d;
+  --out: #ef7a72;
+  --in-soft: #24382c;
+  --out-soft: #3d2624;
 }
 
 [data-theme='dark'] .photo-stage img,
@@ -1130,3 +1138,147 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   font-style: normal; font-size: 0.6875rem; font-weight: 800;
   background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 7px;
 }
+
+/* ---------- money: Expensave transactions, calendar layer + Money page ---------- */
+.in { color: var(--in); }
+.out { color: var(--out); }
+
+/* calendar: one amount per day cell, always in the same spot so a column scans */
+.calpage-money {
+  margin-top: auto; align-self: stretch;
+  font-size: 0.6875rem; font-weight: 800; text-align: right;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.calpage-money.in { color: var(--in); }
+.calpage-money.out { color: var(--out); }
+
+/* legend chips double as the show/hide switches for each calendar layer */
+.calpage-legend-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.75rem; font-weight: 700; color: var(--ink);
+  padding: 3px 9px 3px 7px; border-radius: 999px; background: var(--bg);
+  transition: opacity 0.15s ease;
+}
+.calpage-legend-chip i { width: 9px; height: 9px; border-radius: 50%; border: 2px solid transparent; }
+.calpage-legend-chip.off { opacity: 0.45; color: var(--muted); text-decoration: line-through; }
+.calpage-legend-chip:hover { background: var(--accent-soft); }
+
+.calpage-day-money { border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 8px; }
+.calpage-day-money-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 0.75rem; font-weight: 700; color: var(--muted); margin-bottom: 4px;
+}
+.calpage-day-money-head b { font-size: 0.875rem; font-weight: 800; }
+.mny-line.planned { opacity: 0.62; }
+.mny-tag {
+  font-style: normal; font-size: 0.625rem; font-weight: 800; color: var(--muted);
+  background: var(--bg); border-radius: 999px; padding: 1px 6px; margin-left: 6px;
+}
+.mny-amt { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* ---------- Money page ---------- */
+.mny-page {
+  /* the page scrolls in .content, so cards size to their own content instead of
+     being squeezed into equal viewport-height rows */
+  display: grid; gap: 16px;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.3fr);
+  grid-template-areas: 'hero weeks' 'upcoming accounts';
+}
+/* the hero matches the week list's height (it is the headline of the page);
+   the lower cards keep their own */
+.mny-upcoming, .mny-accounts { align-self: start; }
+.mny-hero { grid-area: hero; display: flex; flex-direction: column; }
+.mny-weeks { grid-area: weeks; }
+.mny-upcoming { grid-area: upcoming; }
+.mny-accounts { grid-area: accounts; }
+.mny-page .card-title { display: flex; align-items: center; gap: 8px; }
+
+.mny-hero-value { font-size: 2.75rem; font-weight: 800; line-height: 1.1; color: var(--in); }
+.mny-hero-value.short { color: var(--out); }
+.mny-hero-sub { font-size: 0.8125rem; color: var(--muted); margin: 4px 0 14px; }
+
+.mny-breakdown { display: flex; flex-direction: column; gap: 6px; margin-bottom: auto; }
+.mny-breakdown > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 0.8125rem; }
+.mny-breakdown span { color: var(--muted); font-weight: 600; }
+.mny-breakdown b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.mny-total { border-top: 1px solid var(--line); padding-top: 7px; margin-top: 2px; }
+.mny-total span { color: var(--ink); font-weight: 700; }
+
+.mny-goal { margin-top: 16px; }
+.mny-goal-head { display: flex; justify-content: space-between; font-size: 0.8125rem; font-weight: 700; color: var(--muted); }
+.mny-goal-head b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.mny-goal-bar { height: 8px; border-radius: 999px; background: var(--bg); margin-top: 6px; overflow: hidden; }
+.mny-goal-bar span { display: block; height: 100%; border-radius: 999px; background: var(--in); }
+.mny-typical { margin-top: 12px; font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
+.mny-typical b { font-weight: 800; }
+
+.mny-current { font-size: 0.8125rem; color: var(--muted); margin-bottom: 10px; }
+.mny-week-list { display: flex; flex-direction: column; gap: 4px; }
+.mny-week {
+  display: grid; align-items: center; gap: 10px;
+  grid-template-columns: minmax(110px, 1.1fr) minmax(60px, 1.4fr) auto minmax(70px, auto);
+  padding: 6px 8px; border-radius: 10px; font-size: 0.8125rem;
+}
+.mny-week.current { background: var(--accent-soft); }
+.mny-week.future { opacity: 0.62; }
+.mny-week-range { font-weight: 700; white-space: nowrap; }
+.mny-week-range em {
+  font-style: normal; font-size: 0.625rem; font-weight: 800; color: var(--accent);
+  margin-left: 6px; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.mny-week-bars { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mny-bar { height: 5px; border-radius: 999px; }
+.mny-bar.in { background: var(--in); }
+.mny-bar.out { background: var(--out); }
+.mny-week-io { display: flex; flex-direction: column; gap: 2px; text-align: right; font-size: 0.6875rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mny-week .mny-amt { text-align: right; font-variant-numeric: tabular-nums; }
+
+.mny-txn-list { display: flex; flex-direction: column; gap: 2px; max-height: 26rem; overflow: auto; }
+.mny-txn {
+  display: grid; align-items: center; gap: 9px;
+  grid-template-columns: 9px minmax(86px, auto) 1fr auto;
+  padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 0.8125rem;
+}
+.mny-txn:last-child { border-bottom: none; }
+.mny-dot { width: 9px; height: 9px; border-radius: 50%; }
+.mny-txn-day { color: var(--muted); font-weight: 700; font-size: 0.75rem; white-space: nowrap; }
+.mny-txn-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mny-acc-list { display: flex; flex-direction: column; gap: 8px; }
+.mny-acc { display: grid; grid-template-columns: 9px 1fr auto; align-items: center; gap: 9px; font-size: 0.875rem; }
+.mny-acc b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.mny-err { color: var(--out); }
+
+/* dashboard tile */
+.mny-card { display: flex; flex-direction: column; }
+.mny-card-body { display: flex; flex-direction: column; flex: 1; justify-content: center; min-height: 0; }
+.mny-card-label { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.mny-card-value { font-size: 1.875rem; font-weight: 800; line-height: 1.15; color: var(--in); }
+.mny-card-value.short { color: var(--out); }
+.mny-card-sub { font-size: 0.6875rem; color: var(--muted); }
+.mny-card-week { display: flex; gap: 14px; font-size: 0.8125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mny-card-week i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.mny-card-week i.in { background: var(--in); }
+.mny-card-week i.out { background: var(--out); }
+
+@media (max-width: 1120px) {
+  .mny-page { grid-template-columns: 1fr; grid-template-areas: 'hero' 'weeks' 'upcoming' 'accounts'; height: auto; }
+}
+@media (max-width: 700px) {
+  .mny-hero-value { font-size: 2.25rem; }
+  .mny-week { grid-template-columns: 1fr auto; row-gap: 4px; }
+  .mny-week-bars { grid-column: 1 / -1; flex-direction: row; }
+  .mny-week-bars .mny-bar { height: 4px; }
+  .mny-week-io { flex-direction: row; gap: 8px; }
+  .mny-txn { grid-template-columns: 9px 1fr auto; }
+  .mny-txn-day { grid-column: 2; }
+  .mny-txn-label { grid-column: 2 / -1; }
+}
+.ed-field input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--accent); justify-self: start; }
+.mny-low { border-top: 1px solid var(--line); padding-top: 7px; }
+.mny-low span { color: var(--ink); font-weight: 700; }
+.mny-week .zero, .mny-week-io b.zero { color: var(--muted); }
+/* money lines in the day panel read label-left / amount-right, not stacked */
+.calpage-day-money .mny-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.calpage-day-money .mny-line .cal-event-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calpage-day-money .mny-line .cal-event-time { margin-top: 0; font-size: 0.8125rem; white-space: nowrap; }

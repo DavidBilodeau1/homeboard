@@ -12,7 +12,7 @@ export interface ListCfg {
 
 export type ThemeMode = 'auto' | 'light' | 'dark' | 'sun'
 
-export type TileId = 'calendar' | 'calendarFull' | 'photo' | 'tasks' | 'weather' | 'meals' | 'rewards' | 'airQuality'
+export type TileId = 'calendar' | 'calendarFull' | 'photo' | 'tasks' | 'weather' | 'meals' | 'rewards' | 'airQuality' | 'money'
 
 export interface DashboardTile {
   id: TileId
@@ -54,6 +54,128 @@ export interface FrigateCfg {
   pollSeconds?: number
   /** how many review items to keep in the alerts feed */
   alertLimit?: number
+}
+
+/** One Expensave calendar as HomeBoard shows it: color and label for the UI. */
+export interface ExpensaveCalendarCfg {
+  id: number
+  /** overrides the name Expensave gives the calendar */
+  name?: string
+  color?: string
+}
+
+/** Expensave (github.com/algirdasc/expensave) — household transactions. */
+export interface ExpensaveCfg {
+  /** which calendars to pull; omit/empty to use every calendar on the account */
+  calendars?: ExpensaveCalendarCfg[]
+  /** ISO 4217 code used to format amounts (default CAD) */
+  currency?: string
+  /** how far ahead to count already-scheduled money (default 14 days) */
+  horizonDays?: number
+  /** cash that must stay in the account and is never set aside */
+  buffer?: number
+  /** optional weekly savings target, shown as progress on the Money page */
+  weeklyGoal?: number
+  /** show the transactions layer on the calendar by default (default true) */
+  showInCalendar?: boolean
+}
+
+export interface ExpensaveCalendar {
+  id: number
+  name: string
+  /** Expensave's own total: every confirmed row, including ones dated years
+   *  ahead, so it is not what is in the account today */
+  balance: number
+  /** running balance on the latest day at or before today — the useful one */
+  balanceToday?: number | null
+  shared: boolean
+  owner: string | null
+}
+
+export interface TransactionCategory {
+  id: number
+  name: string
+  color: string | null
+}
+
+/** One transaction. Expensave's sign convention: income > 0, spending < 0. */
+export interface Transaction {
+  id: number
+  /** Expensave calendar id */
+  calendar: number
+  label: string
+  amount: number
+  /** false = planned or not cleared yet, so not in the balance */
+  confirmed: boolean
+  description: string | null
+  category: TransactionCategory | null
+  /** local calendar day, YYYY-MM-DD */
+  date: string
+  at: string | null
+  recurring: boolean
+  frequency: string | null
+}
+
+/** One day of the household ledger; `balance` counts confirmed money only. */
+export interface MoneyDay {
+  date: string
+  income: number
+  expense: number
+  net: number
+  balance: number
+}
+
+export interface MoneyPayload {
+  start: string
+  end: string
+  calendars: ExpensaveCalendar[]
+  transactions: Transaction[]
+  days: MoneyDay[]
+  errors: string[]
+}
+
+export interface MoneyWeek {
+  start: string
+  end: string
+  income: number
+  expense: number
+  net: number
+  /** part of `net` that has not cleared yet (a projection, not a fact) */
+  pending: number
+  count: number
+  current: boolean
+  future: boolean
+}
+
+/** What can safely move to savings today — see savingsPlan() in expensave.ts. */
+export interface SavingsPlan {
+  balance: number
+  uncleared: number
+  upcomingIn: number
+  upcomingOut: number
+  /** lowest the account gets between today and the horizon — the real limit */
+  low: number
+  lowDate: string
+  /** balance once every commitment in the window has landed */
+  projected: number
+  buffer: number
+  horizonDays: number
+  horizonEnd: string
+  setAside: number
+  shortfall: number
+  commitments: Transaction[]
+  unclearedCount: number
+}
+
+export interface MoneyState {
+  calendars: ExpensaveCalendar[]
+  transactions: Transaction[]
+  days: MoneyDay[]
+  weeks: MoneyWeek[]
+  plan: SavingsPlan
+  byDay: Map<string, import('./expensave').DayMoney>
+  currency: string
+  errors: string[]
 }
 
 export interface EntityState {
@@ -167,6 +289,7 @@ export interface AppConfig {
   garbage?: GarbageCfg[]
   airQuality?: AirQualityCfg
   floorPlan?: FloorPlanCfg
+  expensave?: ExpensaveCfg
 }
 
 export interface TodoItem {

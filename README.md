@@ -16,6 +16,9 @@ browser) and receives instant updates over the HA WebSocket API.
   snapshots with an hour of motion activity under each, an alerts feed you can
   acknowledge, live MJPEG + timelapse recap + event clips in one tap, and
   detector/storage/uptime health at a glance
+- **Money** — [Expensave](https://github.com/algirdasc/expensave) transactions as
+  a calendar layer you can switch on and off, plus a weekly view of what is
+  safe to set aside
 - **Photos** — fullscreen slideshow from a mounted folder
 - Live updates via WebSocket (state changes appear within ~1s), 5-min polling
   fallback, full refresh on reconnect after an outage
@@ -55,6 +58,9 @@ Get a token in HA: click your user (bottom-left) → **Security** →
 | `FRIGATE_USER` | — | Frigate username (only if Frigate's own auth is on) |
 | `FRIGATE_PASSWORD` | — | Frigate password |
 | `FRIGATE_TOKEN` | — | JWT instead of user/password |
+| `EXPENSAVE_URL` | — | Expensave base URL, e.g. `https://expensave.example.com` |
+| `EXPENSAVE_EMAIL` | — | Expensave account HomeBoard logs in with |
+| `EXPENSAVE_PASSWORD` | — | that account's password |
 | `EDITOR_ENABLED` | `1` | `0` makes the Settings config editor read-only |
 | `PUBLIC_URL` | — | HomeBoard's own external URL; **setting it enables login** |
 | `AUTH_ENABLED` | auto | `0` forces auth off even when `PUBLIC_URL` is set |
@@ -113,6 +119,9 @@ Mounted as a volume. Two ways to edit:
 - `smartHome.mediaPlayers` — `{ name, entity (media_player.*) }` rows shown as
   a Media card on the Home page: now playing, play/pause, previous/next,
   volume slider
+- `expensave` — the Money integration: `calendars` (`{ id, name?, color? }` —
+  omit to follow every calendar on the account), `currency`, `horizonDays`,
+  `buffer`, `weeklyGoal`, `showInCalendar`
 - `people` — names for the avatar cluster in the top bar
 - `photos.intervalSeconds` — slideshow speed
 - `locale` — e.g. `en-US` or `fr-CA` (affects date/time formatting)
@@ -161,6 +170,47 @@ Nothing reaches Frigate from the browser: images, clips and JSON all travel
 through `/api/frigate/*`, which allow-lists exactly the media paths the UI needs
 (`latest.jpg`, event snapshots/thumbnails/clips, review previews, `preview.mp4`,
 the MJPEG feed) and validates every camera name against Frigate's real list.
+
+## Money (Expensave)
+
+Set `EXPENSAVE_URL`, `EXPENSAVE_EMAIL` and `EXPENSAVE_PASSWORD` and the
+**Money** page appears, fed by your own
+[Expensave](https://github.com/algirdasc/expensave) instance. HomeBoard only
+reads: it logs in server-side (Expensave's access tokens last ten minutes, so it
+just logs in again when one expires) and never lets the browser see the URL or
+the credentials.
+
+**On the calendar.** Each Expensave calendar becomes a layer: every day cell
+shows that day's net, and the day panel lists the transactions behind it.
+Clicking a chip in the calendar legend switches a layer off — Expensave
+calendars, HA calendars and garbage collections alike. The choice is per screen
+(kept in `localStorage`), so the wall panel can hide money while your phone
+shows it. `expensave.showInCalendar: false` starts the layer hidden everywhere.
+
+**Safe to set aside.** The number the page is built around is *the most you can
+move to savings right now*:
+
+```
+cleared balance today
+− charges that have not cleared
+± every transaction scheduled between tomorrow and the horizon, day by day
+= the LOWEST the account gets along the way      ← not the balance at the end
+− the buffer you keep
+```
+
+Taking the low point matters: a paycheque that lands after next week's rent
+cannot pay for it. The breakdown on the page names the day of that low point,
+and `Projected on …` shows where the balance ends up once everything has landed.
+Tune `horizonDays` (default 14) and `buffer` (default 0) in Settings → Money;
+set `weeklyGoal` to get a progress bar against a weekly target.
+
+**Week by week** shows money in, money out and the net for the last five weeks
+and the next three, with the current week highlighted, plus what a typical
+recent week actually leaves over.
+
+Without Expensave configured the page and the tile simply say so; in mock mode
+(`MOCK=1`) a demo ledger with a household and a personal calendar drives
+everything.
 
 ## Preview
 
@@ -238,9 +288,10 @@ HA_URL=https://ha.example.com HA_TOKEN=xxx npm run start
 ## Architecture
 
 ```
-browser ── SPA (React/Vite) ── /api/ha/*      ──► Node/Express proxy ──► HA REST API
-        │                     /api/frigate/* ──► Frigate proxy      ──► Frigate API
-        └───────── /ws ◄──────────────────────── WebSocket bridge ◄─── HA WebSocket API
+browser ── SPA (React/Vite) ── /api/ha/*        ──► Node/Express proxy ──► HA REST API
+        │                     /api/frigate/*   ──► Frigate proxy      ──► Frigate API
+        │                     /api/expensave/* ──► Expensave proxy    ──► Expensave API
+        └───────── /ws ◄────────────────────────── WebSocket bridge ◄─── HA WebSocket API
 ```
 
 The proxy adds the `Authorization: Bearer` header server-side, so the token is

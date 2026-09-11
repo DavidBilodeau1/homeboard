@@ -33,6 +33,21 @@ export function validateConfig(c) {
       if (f[k] !== undefined && !(Number.isFinite(f[k]) && f[k] > 0)) return `frigate.${k} must be a positive number`
     }
   }
+  if (c.expensave !== undefined && c.expensave !== null) {
+    const x = c.expensave
+    if (typeof x !== 'object' || Array.isArray(x)) return 'expensave must be an object'
+    if (x.calendars !== undefined && !(Array.isArray(x.calendars) &&
+      x.calendars.every((r) => r && typeof r === 'object' && Number.isInteger(r.id)))) {
+      return 'expensave.calendars must be an array of { id, name?, color? }'
+    }
+    if (x.horizonDays !== undefined && !(Number.isFinite(x.horizonDays) && x.horizonDays > 0)) {
+      return 'expensave.horizonDays must be a positive number'
+    }
+    for (const k of ['buffer', 'weeklyGoal']) {
+      if (x[k] !== undefined && !Number.isFinite(x[k])) return `expensave.${k} must be a number`
+    }
+    if (x.currency !== undefined && typeof x.currency !== 'string') return 'expensave.currency must be a string'
+  }
   if (c.garbage !== undefined && !isNamedRows(c.garbage)) {
     return 'garbage must be an array of { name, entity, color }'
   }

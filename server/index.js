@@ -7,6 +7,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { mockRouter } from './mock.js'
 import { frigate, FRIGATE_ENABLED, frigateTarget } from './frigate.js'
+import { expensave, EXPENSAVE_ENABLED, expensaveTarget } from './expensave.js'
 import { validateConfig } from './validate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -169,6 +170,7 @@ app.get('/api/config', (_req, res) => {
 
 app.get('/api/meta', (req, res) => res.json({
   editorEnabled: EDITOR_ENABLED, mock: MOCK, authEnabled: AUTH_ENABLED, user: sessionUser(req),
+  expensave: EXPENSAVE_ENABLED || MOCK,
 }))
 
 app.put('/api/config', (req, res) => {
@@ -191,6 +193,11 @@ app.put('/api/config', (req, res) => {
 // Snapshots, alerts and system health come from Frigate through server/frigate.js
 // (mocked when FRIGATE_URL is unset and we're in demo mode).
 app.use('/api/frigate', frigate(MOCK))
+
+// ---------- Expensave (household transactions) ----------
+// Calendars, transactions and daily balances come from Expensave through
+// server/expensave.js; its URL and credentials never reach the browser.
+app.use('/api/expensave', expensave(MOCK))
 
 // ---------- photos: Immich album, falling back to local folder ----------
 const immichFetch = (p, init = {}) =>
@@ -403,6 +410,8 @@ server.listen(PORT, () => {
   if (IMMICH_ENABLED) console.log(`[homeboard] photos from Immich album "${IMMICH_ALBUM}" @ ${IMMICH_URL}`)
   if (FRIGATE_ENABLED) console.log(`[homeboard] Frigate NVR @ ${frigateTarget}`)
   else console.log(`[homeboard] Frigate ${MOCK ? 'MOCKED (demo cameras)' : 'not configured (set FRIGATE_URL)'}`)
+  if (EXPENSAVE_ENABLED) console.log(`[homeboard] Expensave @ ${expensaveTarget}`)
+  else console.log(`[homeboard] Expensave ${MOCK ? 'MOCKED (demo ledger)' : 'not configured (set EXPENSAVE_URL)'}`)
   if (AUTH_ENABLED) console.log(`[homeboard] auth ENABLED — "Log in with Home Assistant" via ${OAUTH_CLIENT_ID}`)
   else console.log(`[homeboard] auth DISABLED (set PUBLIC_URL to enable)`)
 })

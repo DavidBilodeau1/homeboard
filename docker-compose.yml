@@ -23,6 +23,10 @@ services:
       FRIGATE_USER: ${FRIGATE_USER:-}
       FRIGATE_PASSWORD: ${FRIGATE_PASSWORD:-}
       FRIGATE_TOKEN: ${FRIGATE_TOKEN:-}
+      # Expensave (optional): transactions on the calendar + the Money page
+      EXPENSAVE_URL: ${EXPENSAVE_URL:-}
+      EXPENSAVE_EMAIL: ${EXPENSAVE_EMAIL:-}
+      EXPENSAVE_PASSWORD: ${EXPENSAVE_PASSWORD:-}
       # Set to 0 to make the Settings config editor read-only (wall-panel mode)
       EDITOR_ENABLED: ${EDITOR_ENABLED:-1}
       # "Log in with Home Assistant": set PUBLIC_URL to HomeBoard's externally

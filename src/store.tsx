@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import type { AppConfig, CalEvent, TodoItem, ForecastDay, WeatherState, ThemeMode, EntityState, PersonState, GarbageCollection, AirQualityState } from './types'
+import type { AppConfig, CalEvent, TodoItem, ForecastDay, WeatherState, ThemeMode, EntityState, PersonState, GarbageCollection, AirQualityState, MoneyState } from './types'
 import * as api from './api'
 import { addDays, dayKey, monthGrid, startOfMonth } from './util'
 import { normalizeEvents } from './events'
+import {
+  currencyOf, getExpensaveRange, groupByDay, moneyRange, savingsPlan, weeklyMoney,
+} from './expensave'
 import { makeT, resolveLanguage, type Translate } from './i18n'
 
 interface SystemInfo {
@@ -43,6 +46,12 @@ interface Store {
   persons: PersonState[]
   garbage: GarbageCollection[]
   airQuality: AirQualityState | null
+  /** Expensave ledger for the current window, or null when unavailable. */
+  money: MoneyState | null
+  moneyError: string | null
+  /** Calendar layers (HA entity id, 'garbage', `expensave:<id>`) hidden on this screen. */
+  layerVisible: (id: string, fallback?: boolean) => boolean
+  toggleLayer: (id: string, fallback?: boolean) => void
 }
 
 const aqiEntity = (cfg: AppConfig | null): string | null => cfg?.airQuality?.entity ?? null
@@ -62,6 +71,17 @@ const smartHomeEntities = (cfg: AppConfig | null): string[] => {
     ...(sh.locks ?? []).map((l) => l.entity),
     ...(sh.mediaPlayers ?? []).map((m) => m.entity),
   ].filter((e): e is string => !!e)
+}
+
+/** Per-device show/hide choices for calendar layers; only explicit ones are stored. */
+const LAYERS_KEY = 'homeboard-calendar-layers'
+const readLayerPrefs = (): Record<string, boolean> => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LAYERS_KEY) ?? '{}')
+    return raw && typeof raw === 'object' ? raw : {}
+  } catch {
+    return {}
+  }
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -89,6 +109,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [selectedDate, setSelectedDate] = useState(() => new Date())
   const [entityStates, setEntityStates] = useState<Record<string, EntityState | null>>({})
   const [persons, setPersons] = useState<PersonState[]>([])
+  const [money, setMoney] = useState<MoneyState | null>(null)
+  const [moneyError, setMoneyError] = useState<string | null>(null)
+  const [expensaveUp, setExpensaveUp] = useState(false)
+  const [layerPrefs, setLayerPrefs] = useState<Record<string, boolean>>(readLayerPrefs)
   const [themeMode, setThemeModeState] = useState<ThemeMode>(
     () => (localStorage.getItem('homeboard-theme') as ThemeMode) || 'auto',
   )
@@ -210,6 +234,32 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  // Expensave: one window feeds the calendar layer, the weekly table and the
+  // set-aside number, so there is a single fetch per refresh.
+  const refreshMoney = useCallback(async (cfg: AppConfig, cursor: Date) => {
+    const x = cfg.expensave
+    const ids = (x?.calendars ?? []).map((c) => c.id)
+    const today = new Date()
+    const { start, end } = moneyRange(cursor, today, x?.horizonDays)
+    try {
+      const payload = await getExpensaveRange(ids, start, end)
+      setMoney({
+        calendars: payload.calendars,
+        transactions: payload.transactions,
+        days: payload.days,
+        weeks: weeklyMoney(payload.transactions, today),
+        plan: savingsPlan(payload.transactions, payload.days, today, x),
+        byDay: groupByDay(payload.transactions),
+        currency: currencyOf(x),
+        errors: payload.errors,
+      })
+      setMoneyError(null)
+    } catch (e) {
+      setMoney(null)
+      setMoneyError(e instanceof Error ? e.message : String(e))
+    }
+  }, [])
+
   const refreshAll = useCallback((cfg: AppConfig, cursor: Date) => {
     refreshTodos(cfg)
     refreshEvents(cfg, cursor)
@@ -218,7 +268,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     refreshEntities(cfg)
     refreshGarbage(cfg)
     refreshAirQuality(cfg)
-  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshEntities, refreshGarbage, refreshAirQuality])
+    if (cfg.expensave || expensaveUp) refreshMoney(cfg, cursor)
+  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshEntities, refreshGarbage, refreshAirQuality, refreshMoney, expensaveUp])
 
   // keep latest refresh closure available to the websocket handler
   const refresher = useRef<{ cfg: AppConfig | null; cursor: Date }>({ cfg: null, cursor: monthCursor })
@@ -229,6 +280,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     api.getConfig().then(setConfig).catch(() => setConfig(null))
     api.getPhotos().then(setPhotos)
     api.haGet('config').then((c) => { setSystemInfo(c); setConnected(true) }).catch(() => setConnected(false))
+    fetch('/api/meta').then((r) => r.json()).then((m) => setExpensaveUp(!!m.expensave)).catch(() => {})
     refreshSun()
     refreshPersons()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -268,6 +320,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (config) refreshEvents(config, monthCursor)
   }, [monthCursor]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // the ledger window follows the displayed month, and arrives as soon as we
+  // learn Expensave is configured server-side
+  useEffect(() => {
+    if (config && (config.expensave || expensaveUp)) refreshMoney(config, monthCursor)
+  }, [monthCursor, expensaveUp]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // clock
   useEffect(() => {
@@ -403,6 +461,20 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshEntities])
 
+  // show/hide a calendar layer on this screen only; unset layers use `fallback`
+  const layerVisible = useCallback(
+    (id: string, fallback = true) => layerPrefs[id] ?? fallback,
+    [layerPrefs],
+  )
+
+  const toggleLayer = useCallback((id: string, fallback = true) => {
+    setLayerPrefs((prev) => {
+      const next = { ...prev, [id]: !(prev[id] ?? fallback) }
+      try { localStorage.setItem(LAYERS_KEY, JSON.stringify(next)) } catch { /* private mode */ }
+      return next
+    })
+  }, [])
+
   // garbage collections surface as colored all-day events in every calendar view
   const garbageEvents = useMemo<CalEvent[]>(() =>
     garbage.filter((g) => g.dayKey).map((g) => ({
@@ -415,16 +487,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       dayKeys: [g.dayKey!],
       garbage: true,
     })), [garbage])
-  const events = useMemo(() => [...calEvents, ...garbageEvents], [calEvents, garbageEvents])
+  const events = useMemo(
+    () => [...calEvents, ...garbageEvents].filter((e) => layerVisible(e.calendar)),
+    [calEvents, garbageEvents, layerVisible],
+  )
 
   const value = useMemo<Store>(() => ({
     config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
     monthCursor, setMonthCursor, selectedDate, setSelectedDate,
     toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality,
+    money, moneyError, layerVisible, toggleLayer,
   }), [config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
-    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality])
+    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality,
+    money, moneyError, layerVisible, toggleLayer])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

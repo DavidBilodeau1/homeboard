@@ -126,6 +126,15 @@ export const FloorPlanIcon = () => (
   </I>
 )
 
+/** Piggy bank — the Money page and its dashboard tile. */
+export const MoneyIcon = ({ size = 22 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 5.5c3.1.9 5.3 3.4 5.3 6.3 0 1.8-.9 3.5-2.3 4.6V19a1 1 0 0 1-1 1h-1.3a1 1 0 0 1-1-1v-.8a9.7 9.7 0 0 1-3.4 0V19a1 1 0 0 1-1 1H8.9a1 1 0 0 1-1-1v-2.6c-1.2-.9-2-2.1-2.3-3.4H4.4a1 1 0 0 1-1-1v-1.6a1 1 0 0 1 1-1h.4" />
+    <path d="M9.5 5.6A5 5 0 0 1 14.8 4l-.9 3" />
+    <circle cx="16" cy="11" r=".9" fill="currentColor" stroke="none" />
+  </svg>
+)
+
 export const BulbIcon = ({ size = 22 }: { size?: number }) => (
   <I size={size}>
     <path d="M9 18h6M10 21h4" />

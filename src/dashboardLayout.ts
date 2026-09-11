@@ -14,6 +14,7 @@ export const TILE_META: { id: TileId; titleKey: string }[] = [
   { id: 'meals', titleKey: 'card.meals' },
   { id: 'rewards', titleKey: 'card.reward' },
   { id: 'airQuality', titleKey: 'air.title' },
+  { id: 'money', titleKey: 'nav.money' },
 ]
 
 /** Recreates the original hard-coded dashboard arrangement. */
@@ -36,6 +37,7 @@ export const DEFAULT_SIZE: Record<TileId, { w: number; h: number }> = {
   meals: { w: 3, h: 4 },
   rewards: { w: 3, h: 4 },
   airQuality: { w: 3, h: 4 },
+  money: { w: 3, h: 4 },
 }
 
 export const resolveLayout = (d?: DashboardLayout): Required<DashboardLayout> => ({

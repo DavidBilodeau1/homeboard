@@ -7,6 +7,7 @@ import { LoginScreen } from './components/LoginScreen'
 import { makeT, resolveLanguage } from './i18n'
 import { Dashboard } from './pages/Dashboard'
 import { CalendarPage } from './pages/CalendarPage'
+import { MoneyPage } from './pages/MoneyPage'
 import { TodoBoardPage } from './pages/TodoBoardPage'
 import { RewardsPage } from './pages/RewardsPage'
 import { PhotosPage } from './pages/PhotosPage'
@@ -15,7 +16,7 @@ import { SmartHomePage } from './pages/SmartHomePage'
 import { CamerasPage } from './pages/CamerasPage'
 import { FloorPlanPage } from './pages/FloorPlanPage'
 
-const PAGES: Page[] = ['dashboard', 'home', 'cameras', 'floorplan', 'calendar', 'tasks', 'rewards', 'lists', 'meals', 'photos', 'settings']
+const PAGES: Page[] = ['dashboard', 'home', 'cameras', 'floorplan', 'calendar', 'money', 'tasks', 'rewards', 'lists', 'meals', 'photos', 'settings']
 
 const pageFromHash = (): Page => {
   const h = location.hash.replace(/^#\/?/, '') as Page
@@ -52,6 +53,7 @@ function Shell() {
             {page === 'cameras' && <CamerasPage />}
             {page === 'floorplan' && <FloorPlanPage />}
             {page === 'calendar' && <CalendarPage />}
+            {page === 'money' && <MoneyPage />}
             {page === 'tasks' && <TodoBoardPage title={t('nav.tasks')} lists={config?.tasks ?? []} />}
             {page === 'rewards' && <RewardsPage />}
             {page === 'lists' && <TodoBoardPage title={t('nav.lists')} lists={config?.lists ?? []} />}
