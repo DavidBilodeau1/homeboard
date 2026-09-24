@@ -1,5 +1,6 @@
 import express from 'express'
 import { expensaveMockApi } from './expensaveMock.js'
+import { importRouter } from './expensaveImport.js'
 
 /**
  * Expensave integration (https://github.com/algirdasc/expensave).
@@ -14,6 +15,7 @@ import { expensaveMockApi } from './expensaveMock.js'
  *
  *   GET /api/expensave/calendars                     the user's expense calendars
  *   GET /api/expensave/expenses?calendars&start&end  transactions + daily balances
+ *   /api/expensave/import/…                          bank statement upload (expensaveImport.js)
  *
  * Expensave's own API (Symfony + JWT):
  *   POST /api/auth/login                              {email,password} -> {token,refreshToken}
@@ -80,17 +82,24 @@ function authToken() {
   return pending
 }
 
-async function eapi(path, retried = false) {
+async function eapi(path, { method = 'GET', body } = {}, retried = false) {
   const token = await authToken()
   const r = await fetch(`${EXPENSAVE_URL}/api${path}`, {
+    method,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
   })
   if ((r.status === 401 || r.status === 403) && !retried) {
     session = { token: null, exp: 0 }
-    return eapi(path, true)
+    return eapi(path, { method, body }, true)
   }
-  if (!r.ok) throw new Error(`Expensave ${path}: HTTP ${r.status}`)
-  return r.json()
+  if (!r.ok) {
+    // Symfony validation errors carry the reason; surface it instead of a bare status
+    const detail = await r.text().catch(() => '')
+    throw new Error(`Expensave ${method} ${path}: HTTP ${r.status}${detail ? ` ${detail.slice(0, 200)}` : ''}`)
+  }
+  const text = await r.text()
+  return text ? JSON.parse(text) : null
 }
 
 // ---------- normalisation ----------
@@ -151,6 +160,15 @@ export function mergeDays(series) {
 const live = {
   calendars: () => eapi('/calendar'),
   expenses: (id, start, end) => eapi(`/calendar/${id}/expenses/${start}/${end}`),
+  categories: () => eapi('/category'),
+  // the most recent expense with this label (or starting with it), or null
+  suggest: (label) => eapi('/expense/suggest', { method: 'POST', body: { label } }),
+  createExpense: (body) => eapi('/expense', { method: 'POST', body }),
+  // without recurringUpdateScope Expensave touches only this occurrence
+  updateExpense: (id, body) => eapi(`/expense/${id}`, { method: 'PUT', body }),
+  deleteExpense: (id) => eapi(`/expense/${id}`, { method: 'DELETE' }),
+  // `amount` is the balance wanted at `createdAt`; Expensave stores the difference
+  balanceUpdate: (body) => eapi('/balance-update', { method: 'POST', body }),
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -168,8 +186,14 @@ const cached = async (key, fn) => {
   return value
 }
 
-export function expensaveRouter(api) {
+/**
+ * `opts.stateFile` remembers the last bank import; `opts.canWrite` is false on
+ * read-only panels, which may preview a statement but not apply it.
+ */
+export function expensaveRouter(api, opts = {}) {
   const router = express.Router()
+  // an import rewrites the ledger: the next read must not be a cached one
+  router.use('/import', importRouter(api, { ...opts, onChange: () => cache.clear() }))
 
   const normCalendar = (c) => ({
     id: c.id,
@@ -248,5 +272,5 @@ const disabledRouter = () => {
 
 /** Live router when Expensave is configured, the demo ledger in mock mode, and
  *  a "not configured" stub otherwise. */
-export const expensave = (mock = false) =>
-  EXPENSAVE_ENABLED ? expensaveRouter(live) : mock ? expensaveRouter(expensaveMockApi()) : disabledRouter()
+export const expensave = (mock = false, opts = {}) =>
+  EXPENSAVE_ENABLED ? expensaveRouter(live, opts) : mock ? expensaveRouter(expensaveMockApi(), opts) : disabledRouter()

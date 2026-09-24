@@ -197,7 +197,11 @@ app.use('/api/frigate', frigate(MOCK))
 // ---------- Expensave (household transactions) ----------
 // Calendars, transactions and daily balances come from Expensave through
 // server/expensave.js; its URL and credentials never reach the browser.
-app.use('/api/expensave', expensave(MOCK))
+app.use('/api/expensave', expensave(MOCK, {
+  // next to config.json so it lives on the same persistent volume
+  stateFile: path.join(path.dirname(CONFIG_PATH), 'bank-import.json'),
+  canWrite: EDITOR_ENABLED,
+}))
 
 // ---------- photos: Immich album, falling back to local folder ----------
 const immichFetch = (p, init = {}) =>

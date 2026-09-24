@@ -1,6 +1,7 @@
 import { addDays, dayKey, monthGrid, startOfMonth } from './util'
 import type {
-  ExpensaveCalendar, ExpensaveCfg, MoneyDay, MoneyPayload, MoneyWeek, SavingsPlan, Transaction,
+  BankImportStatus, BankPreview, ExpensaveCalendar, ExpensaveCfg, MoneyDay, MoneyPayload, MoneyWeek, SavingsPlan,
+  Transaction,
 } from './types'
 
 /**
@@ -31,6 +32,66 @@ export const getExpensaveCalendars = (): Promise<ExpensaveCalendar[]> =>
 
 export const getExpensaveRange = (ids: number[], start: string, end: string): Promise<MoneyPayload> =>
   fetch(`/api/expensave/expenses?calendars=${ids.join(',')}&start=${start}&end=${end}`).then(json)
+
+// ---------- bank statement import ----------
+export const DEFAULT_IMPORT_EVERY_DAYS = 14
+
+/** Error from the import endpoints; `accounts` is set when the file needs one picked. */
+export class ImportError extends Error {
+  accounts?: string[]
+  constructor(message: string, accounts?: string[]) {
+    super(message)
+    this.accounts = accounts
+  }
+}
+
+const importCall = async (path: string, body?: unknown) => {
+  const r = await fetch(`/api/expensave/import/${path}`, body === undefined ? undefined : {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await r.json().catch(() => null)
+  // 207: applied, with some writes that failed — the body lists them
+  if (!r.ok && r.status !== 207) throw new ImportError(data?.error ?? `HTTP ${r.status}`, data?.accounts)
+  return data
+}
+
+export const getImportStatus = (): Promise<{ lastImport: BankImportStatus | null; canWrite: boolean }> =>
+  importCall('status')
+
+export interface ImportRequest {
+  csv: string
+  calendar?: number
+  account?: string
+}
+
+export const previewBankImport = (req: ImportRequest): Promise<BankPreview> => importCall('preview', req)
+
+export const applyBankImport = (
+  req: ImportRequest & { balance?: number | null; decisions?: Record<number, 'remove' | 'pending'> },
+): Promise<BankImportStatus & { errors: string[] }> => importCall('apply', req)
+
+/** Bank exports are UTF-8 these days, but older ones are Windows-1252. */
+export async function readStatementFile(file: File): Promise<string> {
+  const buf = await file.arrayBuffer()
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf)
+  } catch {
+    return new TextDecoder('windows-1252').decode(buf)
+  }
+}
+
+/**
+ * When the next statement should be imported: `every` days after the last one
+ * ends, so no day falls between two downloads. `days` is negative when overdue.
+ */
+export function nextImportDue(last: BankImportStatus | null, today: Date, every = DEFAULT_IMPORT_EVERY_DAYS) {
+  if (!last) return null
+  const due = addDays(new Date(`${last.to}T00:00:00`), every)
+  const days = Math.round((due.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86_400_000)
+  return { due: dayKey(due), days }
+}
 
 // ---------- config helpers ----------
 export const calendarColor = (cfg: ExpensaveCfg | undefined, id: number, index = 0): string =>

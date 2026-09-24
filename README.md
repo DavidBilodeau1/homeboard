@@ -121,7 +121,8 @@ Mounted as a volume. Two ways to edit:
   volume slider
 - `expensave` — the Money integration: `calendars` (`{ id, name?, color? }` —
   omit to follow every calendar on the account), `currency`, `horizonDays`,
-  `buffer`, `weeklyGoal`, `showInCalendar`
+  `buffer`, `weeklyGoal`, `showInCalendar`, `importEveryDays` (bank statement
+  cadence, default 14)
 - `people` — names for the avatar cluster in the top bar
 - `photos.intervalSeconds` — slideshow speed
 - `locale` — e.g. `en-US` or `fr-CA` (affects date/time formatting)
@@ -176,7 +177,7 @@ the MJPEG feed) and validates every camera name against Frigate's real list.
 Set `EXPENSAVE_URL`, `EXPENSAVE_EMAIL` and `EXPENSAVE_PASSWORD` and the
 **Money** page appears, fed by your own
 [Expensave](https://github.com/algirdasc/expensave) instance. HomeBoard only
-reads: it logs in server-side (Expensave's access tokens last ten minutes, so it
+writes to it when you import a bank statement (below); it logs in server-side (Expensave's access tokens last ten minutes, so it
 just logs in again when one expires) and never lets the browser see the URL or
 the credentials.
 
@@ -207,6 +208,31 @@ set `weeklyGoal` to get a progress bar against a weekly target.
 **Week by week** shows money in, money out and the net for the last five weeks
 and the next three, with the current week highlighted, plus what a typical
 recent week actually leaves over.
+
+**Bank statement.** Every 14 days, download the last 14 days of the chequing
+account as CSV (Desjardins' export works as is; other banks with a date,
+description and amount or withdrawal/deposit column should too) and drop it on
+the Money page's *Bank statement* card. Nothing is written until you confirm the
+review, which shows, for the statement's dates:
+
+- **planned entries confirmed by the bank**: same sign, amount within a few
+  cents, date within 4 days (or two payments to the same payee that add up).
+  The entry keeps its label and category and takes the bank's date and amount.
+- **new transactions**: added as confirmed. Their category comes from
+  Expensave's memory of that label, so recategorising once sticks, otherwise
+  from a keyword guess.
+- **planned entries the bank never saw**: *Remove* (did not happen, or a budget
+  line such as groceries that the real purchases now replace) or *Still coming*
+  (marked unconfirmed, so the set-aside number keeps reserving it). Entries from
+  the last two days default to *Still coming*.
+- **the balance your bank shows**, saved as an Expensave balance update at the
+  end of the statement, so *Safe to set aside* starts from the real balance.
+
+Imported rows carry a `[hb:…]` tag in their description, so uploading an
+overlapping statement never duplicates anything. The card shows when the next
+statement is due and warns about days no statement covered. The last import is
+recorded in `config/bank-import.json`. Read-only panels (`EDITOR_ENABLED=0`)
+can't import.
 
 Without Expensave configured the page and the tile simply say so; in mock mode
 (`MOCK=1`) a demo ledger with a household and a personal calendar drives

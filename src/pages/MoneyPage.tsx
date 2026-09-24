@@ -4,6 +4,7 @@ import { calendarColor, calendarName, fmtMoney, fmtWeekRange } from '../expensav
 import { dayKey } from '../util'
 import type { MoneyWeek, Transaction } from '../types'
 import { MoneyIcon } from '../icons'
+import { BankImport } from '../components/BankImport'
 
 /**
  * The Money page answers one question: how much can we move to savings?
@@ -182,6 +183,8 @@ export function MoneyPage() {
           ))}
         </div>
       </section>
+
+      <BankImport />
 
       <section className="card mny-upcoming">
         <h2 className="card-title">{t('money.upcoming', { days: plan.horizonDays })}</h2>

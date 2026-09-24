@@ -1182,15 +1182,16 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
      being squeezed into equal viewport-height rows */
   display: grid; gap: 16px;
   grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.3fr);
-  grid-template-areas: 'hero weeks' 'upcoming accounts';
+  grid-template-areas: 'hero weeks' 'bank upcoming' 'accounts upcoming';
 }
 /* the hero matches the week list's height (it is the headline of the page);
    the lower cards keep their own */
-.mny-upcoming, .mny-accounts { align-self: start; }
+.mny-upcoming, .mny-accounts, .mny-bank { align-self: start; }
 .mny-hero { grid-area: hero; display: flex; flex-direction: column; }
 .mny-weeks { grid-area: weeks; }
 .mny-upcoming { grid-area: upcoming; }
 .mny-accounts { grid-area: accounts; }
+.mny-bank { grid-area: bank; }
 .mny-page .card-title { display: flex; align-items: center; gap: 8px; }
 
 .mny-hero-value { font-size: 2.75rem; font-weight: 800; line-height: 1.1; color: var(--in); }
@@ -1249,6 +1250,49 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .mny-acc b { font-weight: 800; font-variant-numeric: tabular-nums; }
 .mny-err { color: var(--out); }
 
+/* bank statement sync */
+.mny-bank-status { font-size: 0.875rem; font-weight: 700; }
+.mny-bank-due { font-size: 0.8125rem; font-weight: 700; color: var(--muted); margin-top: 2px; }
+.mny-bank-due.soon { color: var(--accent); }
+.mny-bank-due.late { color: var(--out); }
+.mny-bank-actions { display: flex; gap: 8px; margin: 12px 0 6px; }
+.mny-bank .settings-note { margin-top: 6px; }
+
+.bank-box { width: min(760px, 94vw); }
+.bank-range { font-size: 0.8125rem; font-weight: 700; color: var(--muted); margin-right: auto; }
+.bank-body { overflow: auto; padding: 4px 18px 12px; display: flex; flex-direction: column; gap: 14px; }
+.bank-field { display: flex; flex-direction: column; gap: 5px; font-size: 0.8125rem; font-weight: 700; color: var(--muted); }
+.bank-field input, .bank-field select {
+  font: inherit; font-size: 1.125rem; font-weight: 800; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; max-width: 240px;
+}
+.bank-field select { font-size: 0.875rem; }
+.bank-balance { background: var(--accent-soft); border-radius: 14px; padding: 12px 14px; }
+.bank-balance-math { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.bank-balance-math > div { display: flex; justify-content: space-between; gap: 12px; font-size: 0.8125rem; }
+.bank-balance-math span { color: var(--muted); font-weight: 600; }
+.bank-balance-math b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.bank-balance-math b.in { color: var(--in); }
+.bank-balance-math b.out { color: var(--out); }
+.bank-warn { font-size: 0.8125rem; font-weight: 700; color: var(--out); }
+.bank-section h4, .bank-section summary { font-size: 0.875rem; font-weight: 800; margin-bottom: 4px; }
+.bank-section summary { cursor: pointer; }
+.bank-section .settings-note { margin-bottom: 6px; }
+.bank-row {
+  display: grid; align-items: center; gap: 10px;
+  grid-template-columns: 52px 1fr auto auto;
+  padding: 6px 2px; border-bottom: 1px solid var(--line); font-size: 0.8125rem;
+}
+.bank-row:last-child { border-bottom: none; }
+.bank-day { color: var(--muted); font-weight: 700; font-size: 0.75rem; white-space: nowrap; }
+.bank-label { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bank-label small { display: block; font-size: 0.6875rem; color: var(--muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.bank-choice { display: inline-flex; background: var(--bg); border-radius: 999px; padding: 2px; }
+.bank-choice button { font-size: 0.6875rem; font-weight: 800; color: var(--muted); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.bank-choice button.active { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(80, 50, 40, 0.12); }
+.bank-foot { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+.bank-foot .settings-note { margin-right: auto; }
+
 /* dashboard tile */
 .mny-card { display: flex; flex-direction: column; }
 .mny-card-body { display: flex; flex-direction: column; flex: 1; justify-content: center; min-height: 0; }
@@ -1262,7 +1306,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .mny-card-week i.out { background: var(--out); }
 
 @media (max-width: 1120px) {
-  .mny-page { grid-template-columns: 1fr; grid-template-areas: 'hero' 'weeks' 'upcoming' 'accounts'; height: auto; }
+  .mny-page { grid-template-columns: 1fr; grid-template-areas: 'hero' 'bank' 'weeks' 'upcoming' 'accounts'; height: auto; }
 }
 @media (max-width: 700px) {
   .mny-hero-value { font-size: 2.25rem; }
@@ -1273,6 +1317,9 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   .mny-txn { grid-template-columns: 9px 1fr auto; }
   .mny-txn-day { grid-column: 2; }
   .mny-txn-label { grid-column: 2 / -1; }
+  .bank-row { grid-template-columns: 44px 1fr auto; }
+  .bank-choice { grid-column: 2 / -1; justify-self: start; }
+  .bank-body { padding: 4px 12px 12px; }
 }
 .ed-field input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--accent); justify-self: start; }
 .mny-low { border-top: 1px solid var(--line); padding-top: 7px; }

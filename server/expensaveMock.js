@@ -38,6 +38,8 @@ const CATEGORIES = {
   fun: { id: 8, name: 'Entertainment', color: '#8e6cd6' },
   savings: { id: 9, name: 'Savings', color: '#2e9e8f' },
 }
+for (const c of Object.values(CATEGORIES)) c.type = 'user'
+const BALANCE_CATEGORY = { id: 99, name: 'Balance update', color: '#24485d', type: 'balance_update' }
 
 /** Payday: every second Friday, anchored so the cadence never drifts. */
 const PAY_ANCHOR = Date.UTC(2024, 0, 5) // a Friday
@@ -112,12 +114,39 @@ function ledger(calendarId, today) {
 
 export function expensaveMockApi(now = () => new Date()) {
   const ledgers = new Map()
+  // writes (bank imports) live on top of the generated ledger, in memory
+  const added = []
+  const edits = new Map()
+  const deleted = new Set()
+  let nextId = 900000
   const rowsFor = (calendarId) => {
     const today = now()
     const cacheKey = `${calendarId}:${key(today)}`
     if (!ledgers.has(cacheKey)) ledgers.set(cacheKey, ledger(calendarId, today))
-    return ledgers.get(cacheKey)
+    return [...ledgers.get(cacheKey), ...added]
+      .filter((r) => r.calendar.id === calendarId && !deleted.has(r.id))
+      .map((r) => edits.get(r.id) ?? r)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   }
+  const findRow = (id) => {
+    for (const c of CALENDARS) {
+      const hit = rowsFor(c.id).find((r) => r.id === Number(id))
+      if (hit) return hit
+    }
+    throw new Error(`Expensave /expense/${id}: HTTP 404`)
+  }
+  const categoryOf = (ref) =>
+    Object.values(CATEGORIES).find((c) => c.id === ref?.id) ?? { id: 15, name: 'Uncategorized', color: '#394852', type: 'uncategorized' }
+  const fromBody = (b, base = {}) => ({
+    ...base,
+    label: b.label,
+    amount: round2(b.amount),
+    confirmed: b.confirmed !== false,
+    description: b.description ?? null,
+    category: categoryOf(b.category),
+    calendar: { id: b.calendar.id },
+    createdAt: String(b.createdAt).replace('T', ' ').slice(0, 19),
+  })
 
   const balanceToDate = (calendarId, start) => {
     const cal = CALENDARS.find((c) => c.id === calendarId)
@@ -137,6 +166,45 @@ export function expensaveMockApi(now = () => new Date()) {
           .reduce((sum, r) => sum + r.amount, c.opening)),
         shared: c.id === 1,
       }))
+    },
+
+    async categories() {
+      return [...Object.values(CATEGORIES), { id: 15, name: 'Uncategorized', color: '#394852', type: 'uncategorized' }]
+    },
+
+    async suggest(label) {
+      return CALENDARS.flatMap((c) => rowsFor(c.id)).reverse().find((r) => r.label.toLowerCase() === label.toLowerCase()) ?? null
+    },
+
+    async createExpense(body) {
+      const row = fromBody(body, { id: ++nextId, recurring: false, recurringFrequency: null })
+      added.push(row)
+      return row
+    },
+
+    async updateExpense(id, body) {
+      const row = fromBody(body, findRow(id))
+      edits.set(row.id, row)
+      return row
+    },
+
+    async deleteExpense(id) {
+      findRow(id)
+      deleted.add(Number(id))
+      return null
+    },
+
+    async balanceUpdate(body) {
+      const cal = CALENDARS.find((c) => c.id === body.calendar.id)
+      const at = String(body.createdAt).replace('T', ' ').slice(0, 19)
+      const soFar = rowsFor(cal.id).filter((r) => r.confirmed && r.createdAt < at).reduce((s, r) => s + r.amount, cal.opening)
+      const row = {
+        id: ++nextId, label: 'Balance Update', amount: round2(body.amount - soFar), confirmed: true,
+        description: body.description ?? null, category: BALANCE_CATEGORY, calendar: { id: cal.id },
+        createdAt: at, recurring: false, recurringFrequency: null,
+      }
+      added.push(row)
+      return row
     },
 
     async expenses(calendarId, start, end) {

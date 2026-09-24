@@ -43,6 +43,9 @@ export function validateConfig(c) {
     if (x.horizonDays !== undefined && !(Number.isFinite(x.horizonDays) && x.horizonDays > 0)) {
       return 'expensave.horizonDays must be a positive number'
     }
+    if (x.importEveryDays !== undefined && !(Number.isFinite(x.importEveryDays) && x.importEveryDays > 0)) {
+      return 'expensave.importEveryDays must be a positive number'
+    }
     for (const k of ['buffer', 'weeklyGoal']) {
       if (x[k] !== undefined && !Number.isFinite(x[k])) return `expensave.${k} must be a number`
     }

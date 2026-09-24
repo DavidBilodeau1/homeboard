@@ -62,7 +62,8 @@
     "horizonDays": 14,
     "buffer": 500,
     "weeklyGoal": 200,
-    "showInCalendar": true
+    "showInCalendar": true,
+    "importEveryDays": 14
   },
   "dashboard": {
     "cols": 12,

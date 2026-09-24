@@ -19,7 +19,7 @@ export const makeT = (lang: string): Translate => {
       s = lookup(`${key}_${vars.count === 1 ? 'one' : 'other'}`)
     }
     s ??= lookup(key) ?? key
-    if (vars) for (const [k, v] of Object.entries(vars)) s = s!.replace(`{${k}}`, String(v))
+    if (vars) for (const [k, v] of Object.entries(vars)) s = s!.replaceAll(`{${k}}`, String(v))
     return s!
   }
 }

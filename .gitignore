@@ -24,3 +24,7 @@ photos/*
 .vscode/
 .DS_Store
 *.log
+
+# bank statements (Money → import) and what was last imported
+*.csv
+config/bank-import.json

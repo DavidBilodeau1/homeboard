@@ -49,6 +49,8 @@ interface Store {
   /** Expensave ledger for the current window, or null when unavailable. */
   money: MoneyState | null
   moneyError: string | null
+  /** Re-fetch the ledger now (after a bank import rewrote it). */
+  reloadMoney: () => void
   /** Calendar layers (HA entity id, 'garbage', `expensave:<id>`) hidden on this screen. */
   layerVisible: (id: string, fallback?: boolean) => boolean
   toggleLayer: (id: string, fallback?: boolean) => void
@@ -461,6 +463,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshEntities])
 
+  const reloadMoney = useCallback(() => {
+    const { cfg, cursor } = refresher.current
+    if (cfg) refreshMoney(cfg, cursor)
+  }, [refreshMoney])
+
   // show/hide a calendar layer on this screen only; unset layers use `fallback`
   const layerVisible = useCallback(
     (id: string, fallback = true) => layerPrefs[id] ?? fallback,
@@ -497,11 +504,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
     monthCursor, setMonthCursor, selectedDate, setSelectedDate,
     toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality,
-    money, moneyError, layerVisible, toggleLayer,
+    money, moneyError, reloadMoney, layerVisible, toggleLayer,
   }), [config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
     monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality,
-    money, moneyError, layerVisible, toggleLayer])
+    money, moneyError, reloadMoney, layerVisible, toggleLayer])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

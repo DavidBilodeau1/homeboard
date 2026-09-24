@@ -78,6 +78,73 @@ export interface ExpensaveCfg {
   weeklyGoal?: number
   /** show the transactions layer on the calendar by default (default true) */
   showInCalendar?: boolean
+  /** how often a bank statement should be imported on the Money page (default 14 days) */
+  importEveryDays?: number
+}
+
+/** One bank statement line, as the import preview shows it. */
+export interface BankRow {
+  date: string
+  amount: number
+  /** description trimmed to the merchant ("SQ *CENDRILLON") */
+  label: string
+  /** the bank's full description */
+  raw: string
+  /** category a new row will get (Expensave's memory of the label, else a keyword guess) */
+  category?: string | null
+}
+
+/** An Expensave entry the statement touches. */
+export interface BankPlanned {
+  id: number
+  date: string
+  label: string
+  amount: number
+  confirmed: boolean
+  recurring: boolean
+  category: string | null
+  /** for entries the bank never saw: the suggested fate */
+  action?: 'remove' | 'pending'
+}
+
+/** What the last import did — also drives the "next statement due" reminder. */
+export interface BankImportStatus {
+  at: string
+  from: string
+  to: string
+  account: string
+  calendar: number
+  count: number
+  matched: number
+  added: number
+  removed: number
+  pending: number
+  balance: number | null
+  errors: number
+}
+
+/** Dry run of a statement upload (POST /api/expensave/import/preview). */
+export interface BankPreview {
+  from: string
+  to: string
+  count: number
+  account: string
+  accounts: string[]
+  calendar: { id: number; name: string }
+  matched: { entry: BankPlanned; rows: BankRow[] }[]
+  added: BankRow[]
+  duplicates: number
+  missing: (BankPlanned & { action: 'remove' | 'pending' })[]
+  /** balance column of the export, when it has one */
+  bankBalance: number | null
+  /** Expensave's running balance at the end of the statement, today */
+  expensaveBalance: number
+  /** …and once the import is applied, before any balance correction */
+  balanceAfter: number
+  /** days between the previous statement and this one that no upload covered */
+  gapDays: number
+  lastImport: BankImportStatus | null
+  canWrite: boolean
 }
 
 export interface ExpensaveCalendar {
