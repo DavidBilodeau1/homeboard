@@ -5,7 +5,7 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { mockRouter } from './mock.js'
+import { mockRouter, mockEvents } from './mock.js'
 import { frigate, FRIGATE_ENABLED, frigateTarget } from './frigate.js'
 import { expensave, EXPENSAVE_ENABLED, expensaveTarget } from './expensave.js'
 import { validateConfig } from './validate.js'
@@ -348,6 +348,8 @@ const broadcast = (obj) => {
     if (client.readyState === WebSocket.OPEN) client.send(msg)
   }
 }
+
+if (MOCK) mockEvents.on('state_changed', (entityId) => broadcast({ type: 'state_changed', entity_id: entityId }))
 
 const WATCH_PREFIXES = ['todo.', 'calendar.', 'weather.', 'counter.', 'input_number.', 'person.', 'sun.']
 

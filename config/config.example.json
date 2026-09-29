@@ -86,6 +86,9 @@
     "name": "Air Quality",
     "safeMax": 50
   },
+  "hockey": {
+    "entity": "sensor.nhl_mtl"
+  },
   "floorPlan": {
     "house": { "w": [37, 6], "h": [24, 9] },
     "floors": [

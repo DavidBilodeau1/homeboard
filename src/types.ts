@@ -12,7 +12,7 @@ export interface ListCfg {
 
 export type ThemeMode = 'auto' | 'light' | 'dark' | 'sun'
 
-export type TileId = 'calendar' | 'calendarFull' | 'photo' | 'tasks' | 'weather' | 'meals' | 'rewards' | 'airQuality' | 'money'
+export type TileId = 'calendar' | 'calendarFull' | 'photo' | 'tasks' | 'weather' | 'meals' | 'rewards' | 'airQuality' | 'money' | 'hockey'
 
 export interface DashboardTile {
   id: TileId
@@ -275,6 +275,13 @@ export interface AirQualityCfg {
   safeMax?: number // AQI at or below this is "safe"; above it is flagged unsafe
 }
 
+export interface HockeyCfg {
+  /** an NHL API integration sensor, e.g. sensor.nhl_mtl */
+  entity: string
+  /** tracked team's tri-code (MTL); inferred from a `nhl_<team>` entity id when unset */
+  team?: string
+}
+
 export interface AirQualityState {
   value: number | null
   safeMax: number
@@ -355,6 +362,7 @@ export interface AppConfig {
   dashboard?: DashboardLayout
   garbage?: GarbageCfg[]
   airQuality?: AirQualityCfg
+  hockey?: HockeyCfg
   floorPlan?: FloorPlanCfg
   expensave?: ExpensaveCfg
 }

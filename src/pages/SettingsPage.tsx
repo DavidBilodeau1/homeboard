@@ -4,6 +4,7 @@ import { haGet } from '../api'
 import { availableLanguages, type Translate } from '../i18n'
 import { getFrigateState } from '../frigate'
 import { calendarColor, getExpensaveCalendars } from '../expensave'
+import { NHL_TEAMS } from '../hockey'
 import type { AppConfig, ExpensaveCalendar, ExpensaveCfg, NamedEntity, ThemeMode } from '../types'
 
 const THEME_OPTIONS: { id: ThemeMode; labelKey: string }[] = [
@@ -176,7 +177,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="ed-field"><span>{label}</span>{children}</label>
 }
 
-const TABS = ['general', 'calendars', 'money', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'frigate', 'garbage', 'air', 'json'] as const
+const TABS = ['general', 'calendars', 'money', 'tasks', 'meals', 'lists', 'rewards', 'smarthome', 'frigate', 'garbage', 'air', 'hockey', 'json'] as const
 type Tab = (typeof TABS)[number]
 
 export function SettingsPage() {
@@ -196,7 +197,7 @@ export function SettingsPage() {
     general: t('settings.general'), calendars: t('nav.calendar'), money: t('settings.expensave'), tasks: t('nav.tasks'),
     meals: t('nav.meals'), lists: t('nav.lists'), rewards: t('nav.rewards'),
     smarthome: t('nav.home'), frigate: t('settings.frigate'),
-    garbage: t('settings.garbage'), air: t('settings.air'), json: t('settings.json'),
+    garbage: t('settings.garbage'), air: t('settings.air'), hockey: t('settings.hockey'), json: t('settings.json'),
   }), [t])
 
   if (!draft) return <div className="card page-card settings-page"><h2 className="card-title">{t('settings.title')}</h2></div>
@@ -435,6 +436,25 @@ export function SettingsPage() {
                 <Field label={t('settings.airThreshold')}>
                   <input className="ed-input" type="number" min={0} value={draft.airQuality?.safeMax ?? 50} disabled={!draft.airQuality}
                     onChange={(e) => up((d) => { if (d.airQuality) d.airQuality.safeMax = Number(e.target.value) || 0 })} />
+                </Field>
+              </div>
+            )}
+
+            {tab === 'hockey' && (
+              <div className="ed-fields">
+                <p className="settings-note" style={{ margin: 0 }}>{t('settings.hockeyHint')}</p>
+                <Field label={t('settings.hockeyEntity')}>
+                  <EntitySelect value={draft.hockey?.entity} domains={['sensor']} options={options} noneLabel={t('settings.none')}
+                    onChange={(v) => up((d) => { d.hockey = v ? { ...d.hockey, entity: v } : undefined })} />
+                </Field>
+                <Field label={t('settings.hockeyTeam')}>
+                  <select className="ed-select" value={draft.hockey?.team ?? ''} disabled={!draft.hockey}
+                    onChange={(e) => up((d) => { if (d.hockey) d.hockey.team = e.target.value || undefined })}>
+                    <option value="">{t('settings.hockeyTeamAuto')}</option>
+                    {Object.entries(NHL_TEAMS).map(([abbrev, info]) => (
+                      <option key={abbrev} value={abbrev}>{abbrev} · {info.nick}</option>
+                    ))}
+                  </select>
                 </Field>
               </div>
             )}

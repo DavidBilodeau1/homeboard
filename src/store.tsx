@@ -46,6 +46,8 @@ interface Store {
   persons: PersonState[]
   garbage: GarbageCollection[]
   airQuality: AirQualityState | null
+  /** raw state of the configured NHL sensor (see hockey.ts to parse it) */
+  hockey: EntityState | null
   /** Expensave ledger for the current window, or null when unavailable. */
   money: MoneyState | null
   moneyError: string | null
@@ -57,6 +59,8 @@ interface Store {
 }
 
 const aqiEntity = (cfg: AppConfig | null): string | null => cfg?.airQuality?.entity ?? null
+
+const hockeyEntity = (cfg: AppConfig | null): string | null => cfg?.hockey?.entity ?? null
 
 const garbageEntities = (cfg: AppConfig | null): string[] =>
   (cfg?.garbage ?? []).map((g) => g.entity).filter(Boolean)
@@ -101,6 +105,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [calEvents, setCalEvents] = useState<CalEvent[]>([])
   const [garbage, setGarbage] = useState<GarbageCollection[]>([])
   const [airQuality, setAirQuality] = useState<AirQualityState | null>(null)
+  const [hockey, setHockey] = useState<EntityState | null>(null)
   const [weather, setWeather] = useState<WeatherState | null>(null)
   const [forecast, setForecast] = useState<ForecastDay[]>([])
   const [rewardValues, setRewardValues] = useState<Record<string, number | null>>({})
@@ -236,6 +241,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  const refreshHockey = useCallback(async (cfg: AppConfig) => {
+    const id = hockeyEntity(cfg)
+    setHockey(id ? await api.getState(id) : null)
+  }, [])
+
   // Expensave: one window feeds the calendar layer, the weekly table and the
   // set-aside number, so there is a single fetch per refresh.
   const refreshMoney = useCallback(async (cfg: AppConfig, cursor: Date) => {
@@ -270,8 +280,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     refreshEntities(cfg)
     refreshGarbage(cfg)
     refreshAirQuality(cfg)
+    refreshHockey(cfg)
     if (cfg.expensave || expensaveUp) refreshMoney(cfg, cursor)
-  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshEntities, refreshGarbage, refreshAirQuality, refreshMoney, expensaveUp])
+  }, [refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshEntities, refreshGarbage, refreshAirQuality, refreshHockey, refreshMoney, expensaveUp])
 
   // keep latest refresh closure available to the websocket handler
   const refresher = useRef<{ cfg: AppConfig | null; cursor: Date }>({ cfg: null, cursor: monthCursor })
@@ -387,6 +398,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           else if (id.startsWith('person.')) debounced('persons', refreshPersons)
           else if (garbageEntities(cfg).includes(id)) debounced('garbage', () => refreshGarbage(cfg))
           else if (id === aqiEntity(cfg)) debounced('aqi', () => refreshAirQuality(cfg))
+          // live games update every few seconds; this fetches only the one sensor
+          else if (id === hockeyEntity(cfg)) debounced('nhl', () => refreshHockey(cfg))
           else if (smartHomeEntities(cfg).includes(id) || extraRef.current.includes(id))
             debounced('ent', () => refreshEntities(cfg))
         } catch { /* ignore malformed frames */ }
@@ -402,7 +415,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       Object.values(timers).forEach(clearTimeout)
       ws?.close()
     }
-  }, [refreshAll, refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshSun, refreshEntities, refreshPersons, refreshGarbage, refreshAirQuality])
+  }, [refreshAll, refreshTodos, refreshEvents, refreshWeather, refreshRewards, refreshSun, refreshEntities, refreshPersons, refreshGarbage, refreshAirQuality, refreshHockey])
 
   // ----- actions -----
   const toggleItem = useCallback(async (entity: string, item: TodoItem) => {
@@ -503,11 +516,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
     monthCursor, setMonthCursor, selectedDate, setSelectedDate,
-    toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality,
+    toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality, hockey,
     money, moneyError, reloadMoney, layerVisible, toggleLayer,
   }), [config, locale, language, t, now, todos, events, weather, forecast, rewardValues, photos,
     systemInfo, connected, themeMode, resolvedTheme, setThemeMode,
-    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality,
+    monthCursor, selectedDate, toggleItem, addItem, removeItem, adjustReward, entityStates, callService, trackEntities, reloadConfig, saveConfig, persons, garbage, airQuality, hockey,
     money, moneyError, reloadMoney, layerVisible, toggleLayer])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

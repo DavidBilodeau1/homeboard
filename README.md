@@ -19,6 +19,10 @@ browser) and receives instant updates over the HA WebSocket API.
 - **Money** — [Expensave](https://github.com/algirdasc/expensave) transactions as
   a calendar layer you can switch on and off, plus a weekly view of what is
   safe to set aside
+- **Hockey** — your NHL team's next or current game from the
+  [NHL API](https://github.com/JayBlackedOut/hass-nhlapi) integration: puck-drop
+  countdown and TV channels before, live score, period clock, shots and last
+  goal during (with a full-tile celebration when your team scores), result after
 - **Photos** — fullscreen slideshow from a mounted folder
 - Live updates via WebSocket (state changes appear within ~1s), 5-min polling
   fallback, full refresh on reconnect after an outage

@@ -53,6 +53,16 @@ describe('validateConfig', () => {
     expect(validateConfig(c)).toMatch(/airQuality/)
   })
 
+  it('validates hockey shape', () => {
+    const c = example()
+    c.hockey = { team: 'MTL' }
+    expect(validateConfig(c)).toMatch(/hockey/)
+    c.hockey = { entity: 'sensor.nhl_mtl', team: 8 }
+    expect(validateConfig(c)).toMatch(/hockey\.team/)
+    c.hockey = { entity: 'sensor.nhl_mtl', team: 'MTL' }
+    expect(validateConfig(c)).toBeNull()
+  })
+
   it('ignores unknown keys so the schema can grow', () => {
     const c = example()
     c.someFutureFeature = { anything: true }

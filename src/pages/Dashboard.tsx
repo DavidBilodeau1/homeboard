@@ -13,6 +13,7 @@ import { DEFAULT_SIZE, GRID_MARGIN, TILE_META, resolveLayout } from '../dashboar
 import { CalendarFullCard } from '../components/CalendarFullCard'
 import { AirQualityCard } from '../components/AirQualityCard'
 import { MoneyCard } from '../components/MoneyCard'
+import { HockeyCard } from '../components/HockeyCard'
 import { EditIcon, PlusIcon, TrashIcon } from '../icons'
 
 const RGL = WidthProvider(GridLayout)
@@ -72,6 +73,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
       case 'rewards': return <RewardsCard />
       case 'airQuality': return <AirQualityCard />
       case 'money': return <MoneyCard onOpen={() => !editing && onNavigate('money')} />
+      case 'hockey': return <HockeyCard linkable={!editing} />
     }
   }
 

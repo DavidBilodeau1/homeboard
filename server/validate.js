@@ -60,6 +60,13 @@ export function validateConfig(c) {
       return 'airQuality must be an object with an entity string'
     }
   }
+  if (c.hockey !== undefined && c.hockey !== null) {
+    const h = c.hockey
+    if (typeof h !== 'object' || Array.isArray(h) || typeof h.entity !== 'string') {
+      return 'hockey must be an object with an entity string'
+    }
+    if (h.team !== undefined && typeof h.team !== 'string') return 'hockey.team must be a team abbreviation string'
+  }
   if (c.dashboard !== undefined) {
     const d = c.dashboard
     if (!d || typeof d !== 'object' || Array.isArray(d)) return 'dashboard must be an object'

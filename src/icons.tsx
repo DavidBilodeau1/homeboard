@@ -390,3 +390,11 @@ export const FilmIcon = ({ size = 18 }: { size?: number }) => (
     <line x1="8.5" y1="5" x2="8.5" y2="19" /><line x1="15.5" y1="5" x2="15.5" y2="19" />
   </I>
 )
+
+export const HockeyIcon = ({ size = 20 }: { size?: number }) => (
+  <I size={size}>
+    <path d="M6 3l5.5 12.5a2 2 0 0 1-1.8 2.8H3.5" />
+    <path d="M18 3l-5.5 12.5a2 2 0 0 0 1.8 2.8h6.2" />
+    <ellipse cx="12" cy="20" rx="2.6" ry="1.1" />
+  </I>
+)
