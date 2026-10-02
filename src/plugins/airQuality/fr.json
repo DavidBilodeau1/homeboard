@@ -1,0 +1,12 @@
+{
+  "air.title": "Qualité de l'air",
+  "air.good": "Bon",
+  "air.unsafe": "Malsain",
+  "air.stayInside": "Rester à l'intérieur",
+  "air.settings.entity": "Capteur (IQA)",
+  "air.settings.name": "Nom affiché",
+  "air.settings.threshold": "Sécuritaire jusqu'à (IQA)",
+  "air.settings.hint": "Choisissez le capteur d'indice de qualité de l'air. Au-dessus du seuil, une alerte rouge apparaît dans l'en-tête et la tuile passe en avertissement.",
+  "air.plugin.title": "Qualité de l’air",
+  "air.plugin.description": "Une tuile de qualité de l’air, et une alerte dans l’en-tête quand l’air est malsain."
+}

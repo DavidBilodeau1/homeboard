@@ -1,79 +1,48 @@
-// Server-side validation for PUT /api/config. Unknown keys are deliberately
-// ignored so the schema can grow without a server change.
+import { firstError, isNamedRows, isObject, isOptionalString } from './checks.js'
+import { PLUGINS } from './plugins/index.js'
 
-const isNamedRows = (v) =>
-  v === undefined ||
-  (Array.isArray(v) && v.every((r) => r && typeof r === 'object' && typeof r.name === 'string' &&
-    (r.entity === null || r.entity === undefined || typeof r.entity === 'string')))
+const LIST_SECTIONS = ['tasks', 'meals', 'lists', 'rewards']
+const SMART_HOME_LISTS = ['sensors', 'lights', 'locks', 'mediaPlayers']
 
-export function validateConfig(c) {
-  if (!c || typeof c !== 'object' || Array.isArray(c)) return 'config must be a JSON object'
-  if (typeof c.weatherEntity !== 'string' || !c.weatherEntity) return 'weatherEntity must be a non-empty string'
-  for (const k of ['calendars', 'tasks', 'meals', 'lists', 'rewards']) {
-    if (k === 'calendars') {
-      if (!Array.isArray(c.calendars) || !c.calendars.every((r) => r && typeof r.entity === 'string')) {
-        return 'calendars must be an array of { entity, name?, color }'
-      }
-    } else if (!isNamedRows(c[k])) return `${k} must be an array of { name, entity }`
-  }
-  if (c.smartHome !== undefined) {
-    const sh = c.smartHome
-    if (!sh || typeof sh !== 'object' || Array.isArray(sh)) return 'smartHome must be an object'
-    for (const k of ['sensors', 'lights', 'locks', 'mediaPlayers']) {
-      if (!isNamedRows(sh[k])) return `smartHome.${k} must be an array of { name, entity }`
-    }
-  }
-  if (c.frigate !== undefined && c.frigate !== null) {
-    const f = c.frigate
-    if (typeof f !== 'object' || Array.isArray(f)) return 'frigate must be an object'
-    if (f.cameras !== undefined && !(Array.isArray(f.cameras) && f.cameras.every((n) => typeof n === 'string'))) {
-      return 'frigate.cameras must be an array of Frigate camera names'
-    }
-    for (const k of ['refreshSeconds', 'pollSeconds', 'alertLimit']) {
-      if (f[k] !== undefined && !(Number.isFinite(f[k]) && f[k] > 0)) return `frigate.${k} must be a positive number`
-    }
-  }
-  if (c.expensave !== undefined && c.expensave !== null) {
-    const x = c.expensave
-    if (typeof x !== 'object' || Array.isArray(x)) return 'expensave must be an object'
-    if (x.calendars !== undefined && !(Array.isArray(x.calendars) &&
-      x.calendars.every((r) => r && typeof r === 'object' && Number.isInteger(r.id)))) {
-      return 'expensave.calendars must be an array of { id, name?, color? }'
-    }
-    if (x.horizonDays !== undefined && !(Number.isFinite(x.horizonDays) && x.horizonDays > 0)) {
-      return 'expensave.horizonDays must be a positive number'
-    }
-    if (x.importEveryDays !== undefined && !(Number.isFinite(x.importEveryDays) && x.importEveryDays > 0)) {
-      return 'expensave.importEveryDays must be a positive number'
-    }
-    for (const k of ['buffer', 'weeklyGoal']) {
-      if (x[k] !== undefined && !Number.isFinite(x[k])) return `expensave.${k} must be a number`
-    }
-    if (x.currency !== undefined && typeof x.currency !== 'string') return 'expensave.currency must be a string'
-  }
-  if (c.garbage !== undefined && !isNamedRows(c.garbage)) {
-    return 'garbage must be an array of { name, entity, color }'
-  }
-  if (c.airQuality !== undefined && c.airQuality !== null) {
-    const a = c.airQuality
-    if (typeof a !== 'object' || Array.isArray(a) || typeof a.entity !== 'string') {
-      return 'airQuality must be an object with an entity string'
-    }
-  }
-  if (c.hockey !== undefined && c.hockey !== null) {
-    const h = c.hockey
-    if (typeof h !== 'object' || Array.isArray(h) || typeof h.entity !== 'string') {
-      return 'hockey must be an object with an entity string'
-    }
-    if (h.team !== undefined && typeof h.team !== 'string') return 'hockey.team must be a team abbreviation string'
-  }
-  if (c.dashboard !== undefined) {
-    const d = c.dashboard
-    if (!d || typeof d !== 'object' || Array.isArray(d)) return 'dashboard must be an object'
-    if (!Array.isArray(d.tiles)) return 'dashboard.tiles must be an array'
-    const ok = d.tiles.every((tile) => tile && typeof tile.id === 'string' &&
-      ['x', 'y', 'w', 'h'].every((f) => Number.isFinite(tile[f])))
-    if (!ok) return 'dashboard.tiles items must be { id, x, y, w, h }'
+const isCalendarList = (v) => v === undefined || (Array.isArray(v) && v.every((row) => isObject(row) && typeof row.entity === 'string'))
+
+const isTile = (tile) => isObject(tile) && typeof tile.id === 'string' && ['x', 'y', 'w', 'h'].every((key) => Number.isFinite(tile[key]))
+
+function validateSmartHome(smartHome) {
+  if (smartHome === undefined) return null
+  if (!isObject(smartHome)) return 'smartHome must be an object'
+  const bad = SMART_HOME_LISTS.find((key) => !isNamedRows(smartHome[key]))
+  return bad ? `smartHome.${bad} must be an array of { name, entity }` : null
+}
+
+function validateDashboard(dashboard) {
+  if (dashboard === undefined) return null
+  if (!isObject(dashboard)) return 'dashboard must be an object'
+  if (!Array.isArray(dashboard.tiles)) return 'dashboard.tiles must be an array'
+  return dashboard.tiles.every(isTile) ? null : 'dashboard.tiles items must be { id, x, y, w, h }'
+}
+
+function validatePlugins(plugins) {
+  if (plugins === undefined) return null
+  if (!isObject(plugins)) return 'plugins must be an object'
+  for (const plugin of PLUGINS) {
+    const settings = plugins[plugin.id]
+    if (settings === undefined) continue
+    if (!isObject(settings)) return `plugins.${plugin.id} must be an object`
+    if (settings.enabled !== undefined && typeof settings.enabled !== 'boolean') return `plugins.${plugin.id}.enabled must be true or false`
+    const error = plugin.validate?.(settings)
+    if (error) return `plugins.${plugin.id}: ${error}`
   }
   return null
+}
+
+/** Validation for PUT /api/config. Unknown keys are ignored so the schema can grow. */
+export function validateConfig(config) {
+  if (!isObject(config)) return 'config must be a JSON object'
+  const badList = LIST_SECTIONS.find((key) => !isNamedRows(config[key]))
+  return firstError([
+    [isOptionalString(config.weatherEntity), 'weatherEntity must be an entity id'],
+    [isCalendarList(config.calendars), 'calendars must be an array of { entity, name?, color }'],
+    [!badList, `${badList} must be an array of { name, entity }`],
+  ]) ?? validateSmartHome(config.smartHome) ?? validateDashboard(config.dashboard) ?? validatePlugins(config.plugins)
 }

@@ -1,40 +1,22 @@
 import React from 'react'
+import type { PageDefinition } from '../plugins/types'
 import { useStore } from '../store'
-import {
-  DashboardIcon, HomeIcon, CalendarIcon, TasksIcon, StarIcon,
-  ListsIcon, MealsIcon, PhotosIcon, SettingsIcon, FloorPlanIcon, CameraIcon, MoneyIcon,
-} from '../icons'
 
-export type Page = 'dashboard' | 'home' | 'cameras' | 'floorplan' | 'calendar' | 'money' | 'tasks' | 'rewards' | 'lists' | 'meals' | 'photos' | 'settings'
+interface Props {
+  pages: PageDefinition[]
+  current: string
+  onNavigate: (page: string) => void
+}
 
-const ITEMS: { id: Page; icon: React.ReactNode }[] = [
-  { id: 'dashboard', icon: <DashboardIcon /> },
-  { id: 'home', icon: <HomeIcon /> },
-  { id: 'cameras', icon: <CameraIcon size={22} /> },
-  { id: 'floorplan', icon: <FloorPlanIcon /> },
-  { id: 'calendar', icon: <CalendarIcon /> },
-  { id: 'money', icon: <MoneyIcon /> },
-  { id: 'tasks', icon: <TasksIcon /> },
-  { id: 'rewards', icon: <StarIcon /> },
-  { id: 'lists', icon: <ListsIcon /> },
-  { id: 'meals', icon: <MealsIcon /> },
-  { id: 'photos', icon: <PhotosIcon /> },
-  { id: 'settings', icon: <SettingsIcon /> },
-]
-
-export function Sidebar({ page, onNavigate }: { page: Page; onNavigate: (p: Page) => void }) {
+export function Sidebar({ pages, current, onNavigate }: Props) {
   const { t } = useStore()
   return (
     <nav className="sidebar">
       <div className="side-items">
-        {ITEMS.map((it) => (
-          <button
-            key={it.id}
-            className={`side-btn${page === it.id ? ' active' : ''}`}
-            onClick={() => onNavigate(it.id)}
-          >
-            {it.icon}
-            <span>{t(`nav.${it.id}`)}</span>
+        {pages.map((page) => (
+          <button key={page.id} className={`side-btn${page.id === current ? ' active' : ''}`} onClick={() => onNavigate(page.id)}>
+            {page.icon}
+            <span>{t(page.titleKey)}</span>
           </button>
         ))}
       </div>

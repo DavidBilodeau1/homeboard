@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
 import { useStore } from '../store'
-import type { ListCfg } from '../types'
 import { PlusIcon, TrashIcon } from '../icons'
 
-/** Shared page for Tasks / Lists / Meals: tabbed todo lists with check/add/remove. */
-export function TodoBoardPage({ title, lists }: { title: string; lists: ListCfg[] }) {
-  const { todos, toggleItem, addItem, removeItem, t } = useStore()
-  const usable = lists.filter((l) => l.entity)
+/** Tabbed HA todo lists with check, add and remove; one page per config section. */
+export function TodoBoardPage({ section }: { section: 'tasks' | 'lists' | 'meals' }) {
+  const { config, todos, toggleItem, addItem, removeItem, t } = useStore()
+  const title = t(`nav.${section}`)
+  const usable = (config?.[section] ?? []).filter((l) => l.entity)
   const [active, setActive] = useState(0)
   const [draft, setDraft] = useState('')
   const cur = usable[Math.min(active, Math.max(usable.length - 1, 0))]

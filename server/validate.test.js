@@ -4,9 +4,15 @@ import { validateConfig } from './validate.js'
 
 const example = () => JSON.parse(readFileSync(new URL('../config/config.example.json', import.meta.url), 'utf8'))
 
+const withPlugin = (id, settings) => ({ ...example(), plugins: { [id]: { enabled: true, ...settings } } })
+
 describe('validateConfig', () => {
   it('accepts the shipped example config', () => {
     expect(validateConfig(example())).toBeNull()
+  })
+
+  it('accepts an empty config, so a fresh install starts from nothing', () => {
+    expect(validateConfig({})).toBeNull()
   })
 
   it('rejects non-objects', () => {
@@ -15,75 +21,52 @@ describe('validateConfig', () => {
     expect(validateConfig('{}')).toMatch(/JSON object/)
   })
 
-  it('requires weatherEntity', () => {
-    const c = example()
-    delete c.weatherEntity
-    expect(validateConfig(c)).toMatch(/weatherEntity/)
+  it('rejects a weatherEntity that is not a string', () => {
+    expect(validateConfig({ weatherEntity: 42 })).toMatch(/weatherEntity/)
   })
 
   it('rejects malformed calendars', () => {
-    const c = example()
-    c.calendars = [{ name: 'no entity' }]
-    expect(validateConfig(c)).toMatch(/calendars/)
+    expect(validateConfig({ calendars: [{ name: 'no entity' }] })).toMatch(/calendars/)
   })
 
   it('allows list rows with a null entity (unassigned row)', () => {
-    const c = example()
-    c.tasks = [{ name: 'Person A', entity: null }]
-    expect(validateConfig(c)).toBeNull()
+    expect(validateConfig({ tasks: [{ name: 'Alex', entity: null }] })).toBeNull()
+  })
+
+  it('names the malformed list section', () => {
+    expect(validateConfig({ rewards: [{ entity: 'counter.x' }] })).toMatch(/^rewards/)
   })
 
   it('rejects malformed smartHome sections, including mediaPlayers', () => {
-    const c = example()
-    c.smartHome = { mediaPlayers: [{ entity: 'media_player.x' }] } // missing name
-    expect(validateConfig(c)).toMatch(/mediaPlayers/)
-    c.smartHome = ['nope']
-    expect(validateConfig(c)).toMatch(/smartHome/)
+    expect(validateConfig({ smartHome: { mediaPlayers: [{ entity: 'media_player.x' }] } })).toMatch(/mediaPlayers/)
+    expect(validateConfig({ smartHome: ['nope'] })).toMatch(/smartHome/)
   })
 
   it('validates dashboard tiles', () => {
-    const c = example()
-    c.dashboard = { tiles: [{ id: 'calendar', x: 0, y: 0, w: 'wide', h: 1 }] }
-    expect(validateConfig(c)).toMatch(/tiles/)
+    expect(validateConfig({ dashboard: { tiles: [{ id: 'calendar', x: 0, y: 0, w: 'wide', h: 1 }] } })).toMatch(/tiles/)
   })
 
-  it('validates airQuality shape', () => {
-    const c = example()
-    c.airQuality = { name: 'no entity' }
-    expect(validateConfig(c)).toMatch(/airQuality/)
+  it('ignores unknown keys and unknown plugins so the schema can grow', () => {
+    expect(validateConfig({ someFutureFeature: { anything: true } })).toBeNull()
+    expect(validateConfig({ plugins: { notYetWritten: { enabled: true } } })).toBeNull()
   })
 
-  it('validates hockey shape', () => {
-    const c = example()
-    c.hockey = { team: 'MTL' }
-    expect(validateConfig(c)).toMatch(/hockey/)
-    c.hockey = { entity: 'sensor.nhl_mtl', team: 8 }
-    expect(validateConfig(c)).toMatch(/hockey\.team/)
-    c.hockey = { entity: 'sensor.nhl_mtl', team: 'MTL' }
-    expect(validateConfig(c)).toBeNull()
+  it('requires plugin settings to be objects with a boolean enabled flag', () => {
+    expect(validateConfig({ plugins: { hockey: 'on' } })).toMatch(/plugins\.hockey/)
+    expect(validateConfig({ plugins: { hockey: { enabled: 'yes' } } })).toMatch(/plugins\.hockey\.enabled/)
   })
 
-  it('ignores unknown keys so the schema can grow', () => {
-    const c = example()
-    c.someFutureFeature = { anything: true }
-    expect(validateConfig(c)).toBeNull()
+  it("runs each plugin's own validation", () => {
+    expect(validateConfig(withPlugin('hockey', { team: 8 }))).toMatch(/plugins\.hockey: team/)
+    expect(validateConfig(withPlugin('frigate', { cameras: [{ name: 'front_door' }] }))).toMatch(/plugins\.frigate: cameras/)
+    expect(validateConfig(withPlugin('frigate', { pollSeconds: 0 }))).toMatch(/pollSeconds/)
+    expect(validateConfig(withPlugin('expensave', { calendars: [{ name: 'no id' }] }))).toMatch(/plugins\.expensave: calendars/)
+    expect(validateConfig(withPlugin('airQuality', { safeMax: 'low' }))).toMatch(/safeMax/)
+    expect(validateConfig(withPlugin('garbage', { collections: [{ entity: 'sensor.x' }] }))).toMatch(/collections/)
   })
 
-  it('accepts a frigate section with camera names', () => {
-    const c = example()
-    c.frigate = { cameras: ['front_door'], refreshSeconds: 5 }
-    expect(validateConfig(c)).toBeNull()
-  })
-
-  it('rejects a frigate camera list that is not strings', () => {
-    const c = example()
-    c.frigate = { cameras: [{ name: 'front_door' }] }
-    expect(validateConfig(c)).toMatch(/frigate.cameras/)
-  })
-
-  it('rejects non-positive frigate intervals', () => {
-    const c = example()
-    c.frigate = { pollSeconds: 0 }
-    expect(validateConfig(c)).toMatch(/pollSeconds/)
+  it('accepts an enabled plugin before it is set up', () => {
+    expect(validateConfig(withPlugin('hockey', {}))).toBeNull()
+    expect(validateConfig(withPlugin('frigate', { cameras: ['front_door'], refreshSeconds: 5 }))).toBeNull()
   })
 })

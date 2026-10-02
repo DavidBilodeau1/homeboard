@@ -1,44 +1,31 @@
 services:
   homeboard:
-    # Published by .github/workflows/docker-publish.yml on every `v*` tag, which
-    # is what Watchtower follows — so a release rolls out on its own. `build: .`
-    # stays as a fallback: compose builds from source if the pull fails, and
-    # `docker compose up -d --build` still forces a local build.
+    # released images follow `v*` tags; `--build` builds from source instead
     image: ghcr.io/davidbilodeau1/homeboard:latest
     build: .
     container_name: homeboard
     labels:
-      # only needed if your Watchtower runs with WATCHTOWER_LABEL_ENABLE=true
       - com.centurylinklabs.watchtower.enable=true
     ports:
       - "8090:8090"
     environment:
       HA_URL: ${HA_URL:?set HA_URL in .env}
       HA_TOKEN: ${HA_TOKEN:?set HA_TOKEN in .env}
-      IMMICH_URL: ${IMMICH_URL:-}
-      IMMICH_API_KEY: ${IMMICH_API_KEY:-}
-      IMMICH_ALBUM: ${IMMICH_ALBUM:-Wallpanel}
-      # Frigate NVR (optional): snapshots, alerts, health on the Cameras page
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      AUTH_ENABLED: ${AUTH_ENABLED:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      EDITOR_ENABLED: ${EDITOR_ENABLED:-1}
+      # plugin connections, each optional; turn the plugin on in Settings → Plugins
       FRIGATE_URL: ${FRIGATE_URL:-}
       FRIGATE_USER: ${FRIGATE_USER:-}
       FRIGATE_PASSWORD: ${FRIGATE_PASSWORD:-}
       FRIGATE_TOKEN: ${FRIGATE_TOKEN:-}
-      # Expensave (optional): transactions on the calendar + the Money page
       EXPENSAVE_URL: ${EXPENSAVE_URL:-}
       EXPENSAVE_EMAIL: ${EXPENSAVE_EMAIL:-}
       EXPENSAVE_PASSWORD: ${EXPENSAVE_PASSWORD:-}
-      # Set to 0 to make the Settings config editor read-only (wall-panel mode)
-      EDITOR_ENABLED: ${EDITOR_ENABLED:-1}
-      # "Log in with Home Assistant": set PUBLIC_URL to HomeBoard's externally
-      # reachable base URL (e.g. https://homeboard.example.com) to REQUIRE login.
-      # Leave empty to keep the dashboard open (trusted LAN only).
-      PUBLIC_URL: ${PUBLIC_URL:-}
-      # Optional: force auth off even when PUBLIC_URL is set (AUTH_ENABLED=0)
-      AUTH_ENABLED: ${AUTH_ENABLED:-}
-      # Optional: pin the session-signing secret (else auto-generated & persisted
-      # to ./config/.hb_session_secret so logins survive restarts)
-      SESSION_SECRET: ${SESSION_SECRET:-}
-      # Uncomment if your HA uses a self-signed certificate:
+      IMMICH_URL: ${IMMICH_URL:-}
+      IMMICH_API_KEY: ${IMMICH_API_KEY:-}
+      # for a Home Assistant with a self-signed certificate:
       # NODE_TLS_REJECT_UNAUTHORIZED: "0"
     volumes:
       - ./config:/app/config

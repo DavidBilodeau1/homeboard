@@ -9,7 +9,7 @@ export function RewardsCard() {
     <section className="card rewards-card">
       <h2 className="card-title">{t('card.reward')}</h2>
       <div className="reward-rows">
-        {config.rewards.map((r) => {
+        {(config.rewards ?? []).map((r) => {
           const v = r.entity ? rewardValues[r.entity] : null
           return (
             <div className="reward-row" key={r.name}>

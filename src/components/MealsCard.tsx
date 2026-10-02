@@ -10,7 +10,7 @@ export function MealsCard({ onOpen }: { onOpen?: () => void }) {
     <section className="card meals-card">
       <h2 className="card-title">{t('card.meals')}</h2>
       <div className="meal-lists">
-        {config.meals.map((m, i) => {
+        {(config.meals ?? []).map((m, i) => {
           const items = (m.entity ? todos[m.entity] ?? [] : []).filter((it) => it.status !== 'completed')
           return (
             <div

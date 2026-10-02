@@ -1,0 +1,7 @@
+{
+  "immich.plugin.title": "Photos (Immich)",
+  "immich.plugin.description": "Slideshow pictures from an Immich album.",
+  "immich.plugin.setup": "Set IMMICH_URL and IMMICH_API_KEY on the server.",
+  "immich.settings.album": "Album",
+  "immich.settings.hint": "The Immich album the slideshow shows, owned by or shared with the API key’s user."
+}

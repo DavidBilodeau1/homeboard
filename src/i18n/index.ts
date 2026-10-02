@@ -1,33 +1,37 @@
 import en from './en.json'
 import fr from './fr.json'
 
-const DICTS: Record<string, Record<string, string>> = { en, fr }
-
+export type Messages = Record<string, string>
+/** Messages per language code. */
+export type MessageBundle = Record<string, Messages>
 export type Translate = (key: string, vars?: Record<string, string | number>) => string
 
-/**
- * Minimal translator: flat key lookup with `{var}` interpolation.
- * When `vars.count` is present, `key_one` / `key_other` take precedence
- * over `key`, giving simple pluralization.
- */
-export const makeT = (lang: string): Translate => {
-  const dict = DICTS[lang] ?? DICTS.en
-  const lookup = (key: string) => dict[key] ?? DICTS.en[key]
+const CORE_MESSAGES: MessageBundle = { en, fr }
+const FALLBACK_LANGUAGE = 'en'
+
+export const availableLanguages = Object.keys(CORE_MESSAGES)
+
+/** Core messages with every extra bundle merged in, per language. */
+export const withMessages = (bundles: MessageBundle[]): MessageBundle =>
+  Object.fromEntries(availableLanguages.map((lang) => [
+    lang,
+    Object.assign({}, CORE_MESSAGES[lang], ...bundles.map((bundle) => bundle[lang])),
+  ]))
+
+/** Key lookup with `{var}` interpolation and English fallback; a numeric `count` picks `key_one` / `key_other`. */
+export const makeT = (lang: string, messages: MessageBundle = CORE_MESSAGES): Translate => {
+  const dict = messages[lang] ?? messages[FALLBACK_LANGUAGE]
+  const lookup = (key: string) => dict[key] ?? messages[FALLBACK_LANGUAGE][key]
   return (key, vars) => {
-    let s: string | undefined
-    if (vars && typeof vars.count === 'number') {
-      s = lookup(`${key}_${vars.count === 1 ? 'one' : 'other'}`)
-    }
-    s ??= lookup(key) ?? key
-    if (vars) for (const [k, v] of Object.entries(vars)) s = s!.replaceAll(`{${k}}`, String(v))
-    return s!
+    const plural = vars && typeof vars.count === 'number' ? lookup(`${key}_${vars.count === 1 ? 'one' : 'other'}`) : undefined
+    let text = plural ?? lookup(key) ?? key
+    for (const [name, value] of Object.entries(vars ?? {})) text = text.replaceAll(`{${name}}`, String(value))
+    return text
   }
 }
 
-/** config.language > config.locale prefix > browser language; falls back to en. */
+/** config.language, else the config.locale prefix, else the browser language. */
 export const resolveLanguage = (language?: string, locale?: string): string => {
-  const cand = (language || locale || navigator.language || 'en').slice(0, 2).toLowerCase()
-  return DICTS[cand] ? cand : 'en'
+  const candidate = (language || locale || navigator.language || FALLBACK_LANGUAGE).slice(0, 2).toLowerCase()
+  return CORE_MESSAGES[candidate] ? candidate : FALLBACK_LANGUAGE
 }
-
-export const availableLanguages = Object.keys(DICTS)

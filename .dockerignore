@@ -2,4 +2,8 @@ node_modules
 dist
 photos
 .env
+.env.*
 *.log
+*.csv
+config/*
+!config/config.example.json

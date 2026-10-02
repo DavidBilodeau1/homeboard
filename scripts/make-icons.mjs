@@ -1,6 +1,4 @@
-// Regenerates the PWA icons in public/icons/ — run `node scripts/make-icons.mjs`.
-// Zero-dependency PNG writer: draws the HomeBoard house glyph (white on the
-// crimson accent) with 3x supersampling, then encodes RGBA → PNG via zlib.
+// Regenerates the PWA icons in public/icons/: the house glyph on the accent color, supersampled, encoded with zlib.
 import { deflateSync } from 'zlib'
 import { mkdirSync, writeFileSync } from 'fs'
 import { dirname, join } from 'path'

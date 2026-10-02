@@ -1,0 +1,7 @@
+{
+  "immich.plugin.title": "Photos (Immich)",
+  "immich.plugin.description": "Les photos du diaporama, depuis un album Immich.",
+  "immich.plugin.setup": "Définissez IMMICH_URL et IMMICH_API_KEY sur le serveur.",
+  "immich.settings.album": "Album",
+  "immich.settings.hint": "L’album Immich affiché par le diaporama, appartenant à l’utilisateur de la clé d’API ou partagé avec lui."
+}

@@ -1,143 +1,125 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import GridLayout, { WidthProvider, type Layout } from 'react-grid-layout'
-import { CalendarCard } from '../components/CalendarCard'
-import { PhotoCard } from '../components/PhotoCard'
-import { TasksCard } from '../components/TasksCard'
-import { WeatherCard } from '../components/WeatherCard'
-import { MealsCard } from '../components/MealsCard'
-import { RewardsCard } from '../components/RewardsCard'
-import type { Page } from '../components/Sidebar'
 import { useStore } from '../store'
-import type { DashboardTile, TileId } from '../types'
-import { DEFAULT_SIZE, GRID_MARGIN, TILE_META, resolveLayout } from '../dashboardLayout'
-import { CalendarFullCard } from '../components/CalendarFullCard'
-import { AirQualityCard } from '../components/AirQualityCard'
-import { MoneyCard } from '../components/MoneyCard'
-import { HockeyCard } from '../components/HockeyCard'
+import type { DashboardTile } from '../types'
+import { GRID_MARGIN, resolveLayout } from '../dashboardLayout'
+import { useTileDefinitions } from '../dashboardTiles'
 import { EditIcon, PlusIcon, TrashIcon } from '../icons'
 
 const RGL = WidthProvider(GridLayout)
+const PHONE_MAX_WIDTH = 640
+const PHONE_ROW_HEIGHT = 54
+const MIN_ROW_HEIGHT = 40
+const MIN_TILE_SPAN = 2
+/** where an added tile starts; vertical compaction pulls it up to the first free row */
+const BOTTOM_ROW = 999
 
-export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
-  const { config, reloadConfig, t } = useStore()
-  const resolved = useMemo(() => resolveLayout(config?.dashboard), [config])
-  const cols = resolved.cols
-  const rows = resolved.rows
-
-  const [editing, setEditing] = useState(false)
-  const [tiles, setTiles] = useState<DashboardTile[]>(resolved.tiles)
-  const [editorEnabled, setEditorEnabled] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [addOpen, setAddOpen] = useState(false)
-
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [rowHeight, setRowHeight] = useState(90)
-  const [narrow, setNarrow] = useState(() => window.innerWidth < 640)
-
+function useIsPhone() {
+  const [phone, setPhone] = useState(() => window.innerWidth < PHONE_MAX_WIDTH)
   useEffect(() => {
-    fetch('/api/meta').then((r) => r.json()).then((m) => setEditorEnabled(!!m.editorEnabled)).catch(() => {})
-  }, [])
-
-  // phones get a simple scrolling stack instead of the drag-grid
-  useEffect(() => {
-    const onResize = () => setNarrow(window.innerWidth < 640)
+    const onResize = () => setPhone(window.innerWidth < PHONE_MAX_WIDTH)
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+  return phone
+}
 
-  // keep local tiles in sync with config whenever we're not mid-edit
-  useEffect(() => { if (!editing) setTiles(resolved.tiles) }, [resolved.tiles, editing])
-
-  // size rows to fill the available height
+/** Row height that makes `rows` rows fill the element's height. */
+function useFillingRowHeight(rows: number) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [rowHeight, setRowHeight] = useState(90)
   useEffect(() => {
-    const el = wrapRef.current
+    const el = ref.current
     if (!el) return
-    const recompute = () => {
-      const h = el.clientHeight
-      setRowHeight(Math.max(40, Math.floor((h - GRID_MARGIN * (rows + 1)) / rows)))
-    }
+    const recompute = () => setRowHeight(Math.max(MIN_ROW_HEIGHT, Math.floor((el.clientHeight - GRID_MARGIN * (rows + 1)) / rows)))
     recompute()
-    const ro = new ResizeObserver(recompute)
-    ro.observe(el)
-    return () => ro.disconnect()
+    const observer = new ResizeObserver(recompute)
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [rows])
+  return { ref, rowHeight }
+}
 
-  const renderTile = (id: TileId): React.ReactNode => {
-    switch (id) {
-      case 'calendar': return <CalendarCard />
-      case 'calendarFull': return <CalendarFullCard />
-      case 'photo': return <PhotoCard />
-      case 'tasks': return <TasksCard />
-      case 'weather': return <WeatherCard />
-      case 'meals': return <MealsCard onOpen={() => !editing && onNavigate('meals')} />
-      case 'rewards': return <RewardsCard />
-      case 'airQuality': return <AirQualityCard />
-      case 'money': return <MoneyCard onOpen={() => !editing && onNavigate('money')} />
-      case 'hockey': return <HockeyCard linkable={!editing} />
-    }
+export function Dashboard() {
+  const { config, meta, saveConfig, t } = useStore()
+  const definitions = useTileDefinitions()
+  const layout = useMemo(() => resolveLayout(config?.dashboard), [config])
+  const shown = useMemo(() => layout.tiles.filter((tile) => definitions.has(tile.id)), [layout, definitions])
+
+  const [editing, setEditing] = useState(false)
+  const [tiles, setTiles] = useState<DashboardTile[]>(shown)
+  const [saving, setSaving] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  const phone = useIsPhone()
+  const { ref, rowHeight } = useFillingRowHeight(layout.rows)
+
+  useEffect(() => { if (!editing) setTiles(shown) }, [shown, editing])
+
+  const renderTile = (tile: DashboardTile) => {
+    const Tile = definitions.get(tile.id)?.Component
+    return Tile ? <Tile editing={editing} /> : null
   }
 
-  const layout: Layout[] = tiles.map((tile) => ({
-    i: tile.id, x: tile.x, y: tile.y, w: tile.w, h: tile.h,
-    static: !editing, minW: 2, minH: 2,
-  }))
-
-  const onLayoutChange = (next: Layout[]) => {
-    if (!editing) return
-    setTiles((prev) => next.map((l) => {
-      const t0 = prev.find((p) => p.id === l.i)!
-      return { ...t0, x: l.x, y: l.y, w: l.w, h: l.h }
-    }))
-  }
-
-  const removeTile = (id: TileId) => setTiles((prev) => prev.filter((p) => p.id !== id))
-  const addTile = (id: TileId) => {
-    setAddOpen(false)
-    setTiles((prev) => [...prev, { id, x: 0, y: 999, ...DEFAULT_SIZE[id] }])
-  }
-
-  const missing = TILE_META.filter((m) => !tiles.some((tile) => tile.id === m.id))
-
-  const cancel = () => { setTiles(resolved.tiles); setEditing(false); setAddOpen(false) }
-  const save = async () => {
-    setSaving(true)
-    try {
-      const body = { ...config, dashboard: { cols, rows, tiles } }
-      const r = await fetch('/api/config', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      })
-      if (r.ok) { await reloadConfig(); setEditing(false); setAddOpen(false) }
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // phones: a single scrolling column, tallest-first-intent preserved via each
-  // tile's configured height. No drag/resize here (that's for large screens).
-  if (narrow) {
+  if (phone) {
     return (
       <div className="dash-stack">
         {tiles.map((tile) => (
-          <div key={tile.id} className="dash-stack-tile" style={{ height: tile.h * 54 }}>
-            {renderTile(tile.id)}
+          <div key={tile.id} className="dash-stack-tile" style={{ height: tile.h * PHONE_ROW_HEIGHT }}>
+            {renderTile(tile)}
           </div>
         ))}
       </div>
     )
   }
 
+  const gridLayout: Layout[] = tiles.map((tile) => ({
+    i: tile.id, x: tile.x, y: tile.y, w: tile.w, h: tile.h,
+    static: !editing, minW: MIN_TILE_SPAN, minH: MIN_TILE_SPAN,
+  }))
+
+  const onLayoutChange = (next: Layout[]) => {
+    if (!editing) return
+    setTiles((prev) => next.map((cell) => ({ ...prev.find((tile) => tile.id === cell.i)!, x: cell.x, y: cell.y, w: cell.w, h: cell.h })))
+  }
+
+  const addTile = (id: string) => {
+    setAddOpen(false)
+    setTiles((prev) => [...prev, { id, x: 0, y: BOTTOM_ROW, ...definitions.get(id)!.size }])
+  }
+
+  const missing = [...definitions.values()].filter((definition) => !tiles.some((tile) => tile.id === definition.id))
+
+  const stopEditing = () => {
+    setEditing(false)
+    setAddOpen(false)
+  }
+
+  const cancel = () => {
+    setTiles(shown)
+    stopEditing()
+  }
+
+  const save = async () => {
+    setSaving(true)
+    // tiles of plugins that are switched off keep their place for when they come back
+    const hidden = layout.tiles.filter((tile) => !definitions.has(tile.id))
+    const saved = await saveConfig({ ...config, dashboard: { cols: layout.cols, rows: layout.rows, tiles: [...tiles, ...hidden] } })
+    setSaving(false)
+    if (saved) stopEditing()
+  }
+
   return (
-    <div className={`dash-wrap${editing ? ' editing' : ''}`} ref={wrapRef}>
+    <div className={`dash-wrap${editing ? ' editing' : ''}`} ref={ref}>
       {editing && (
         <div className="dash-toolbar">
           <div className="dash-add">
-            <button className="dash-add-btn" onClick={() => setAddOpen((o) => !o)} disabled={!missing.length}>
+            <button className="dash-add-btn" onClick={() => setAddOpen((open) => !open)} disabled={!missing.length}>
               <PlusIcon size={15} /> {t('dash.addTile')}
             </button>
             {addOpen && (
               <div className="dash-add-menu">
-                {missing.map((m) => (
-                  <button key={m.id} onClick={() => addTile(m.id)}>{t(m.titleKey)}</button>
+                {missing.map((definition) => (
+                  <button key={definition.id} onClick={() => addTile(definition.id)}>{t(definition.titleKey)}</button>
                 ))}
               </div>
             )}
@@ -150,8 +132,8 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
       <RGL
         className={`dash-rgl${editing ? ' editing' : ''}`}
-        layout={layout}
-        cols={cols}
+        layout={gridLayout}
+        cols={layout.cols}
         rowHeight={rowHeight}
         margin={[GRID_MARGIN, GRID_MARGIN]}
         containerPadding={[0, 0]}
@@ -164,16 +146,16 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
         {tiles.map((tile) => (
           <div key={tile.id} className="dash-tile">
             {editing && (
-              <button className="tile-del" onClick={() => removeTile(tile.id)} aria-label={t('settings.remove')}>
+              <button className="tile-del" onClick={() => setTiles((prev) => prev.filter((p) => p.id !== tile.id))} aria-label={t('settings.remove')}>
                 <TrashIcon size={15} />
               </button>
             )}
-            {renderTile(tile.id)}
+            {renderTile(tile)}
           </div>
         ))}
       </RGL>
 
-      {editorEnabled && !editing && (
+      {meta?.editorEnabled && !editing && (
         <button className="dash-edit-fab" onClick={() => setEditing(true)} title={t('dash.edit')}>
           <EditIcon />
         </button>
