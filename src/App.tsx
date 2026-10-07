@@ -1,65 +1,56 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { DashboardProvider, useStore } from './store'
-import { Sidebar, type Page } from './components/Sidebar'
-import { TopBar } from './components/TopBar'
 import { PageBoundary } from './components/ErrorBoundary'
 import { LoginScreen } from './components/LoginScreen'
+import { Sidebar } from './components/Sidebar'
+import { TopBar } from './components/TopBar'
 import { makeT, resolveLanguage } from './i18n'
-import { Dashboard } from './pages/Dashboard'
-import { CalendarPage } from './pages/CalendarPage'
-import { MoneyPage } from './pages/MoneyPage'
-import { TodoBoardPage } from './pages/TodoBoardPage'
-import { RewardsPage } from './pages/RewardsPage'
-import { PhotosPage } from './pages/PhotosPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { SmartHomePage } from './pages/SmartHomePage'
-import { CamerasPage } from './pages/CamerasPage'
-import { FloorPlanPage } from './pages/FloorPlanPage'
+import { navigate, pageFromHash } from './navigation'
+import { DEFAULT_PAGE, usePages } from './pages/registry'
+import { PluginProviders } from './plugins/active'
+import { PLUGIN_MESSAGES } from './plugins/registry'
+import { DashboardProvider } from './store'
 
-const PAGES: Page[] = ['dashboard', 'home', 'cameras', 'floorplan', 'calendar', 'money', 'tasks', 'rewards', 'lists', 'meals', 'photos', 'settings']
+const SIDEBAR_KEY = 'homeboard-sidebar'
 
-const pageFromHash = (): Page => {
-  const h = location.hash.replace(/^#\/?/, '') as Page
-  return PAGES.includes(h) ? h : 'dashboard'
+interface Session {
+  authEnabled: boolean
+  authenticated: boolean
+  user: string | null
+}
+
+function useHashPage() {
+  const [page, setPage] = useState(pageFromHash)
+  useEffect(() => {
+    const onHashChange = () => setPage(pageFromHash())
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+  return page
+}
+
+function useSidebarOpen() {
+  const [open, setOpen] = useState(() => localStorage.getItem(SIDEBAR_KEY) !== 'closed')
+  const toggle = () => setOpen((wasOpen) => {
+    localStorage.setItem(SIDEBAR_KEY, wasOpen ? 'closed' : 'open')
+    return !wasOpen
+  })
+  return [open, toggle] as const
 }
 
 function Shell() {
-  const [page, setPage] = useState<Page>(pageFromHash)
-  const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('homeboard-sidebar') !== 'closed')
-  const { config, t } = useStore()
-
-  useEffect(() => {
-    const onHash = () => setPage(pageFromHash())
-    window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
-  }, [])
-
-  const navigate = (p: Page) => { location.hash = `/${p}` }
-  const toggleSidebar = () => setSidebarOpen((o) => {
-    localStorage.setItem('homeboard-sidebar', o ? 'closed' : 'open')
-    return !o
-  })
+  const pages = usePages()
+  const pageId = useHashPage()
+  const [sidebarOpen, toggleSidebar] = useSidebarOpen()
+  const page = pages.find((p) => p.id === pageId) ?? DEFAULT_PAGE
 
   return (
     <div className={`app${sidebarOpen ? '' : ' sidebar-closed'}`}>
-      <Sidebar page={page} onNavigate={navigate} />
+      <Sidebar pages={pages} current={page.id} onNavigate={navigate} />
       <div className="main">
         <TopBar onToggleSidebar={toggleSidebar} />
         <div className="content">
-          {/* keyed by page so navigating away resets a tripped boundary */}
-          <PageBoundary key={page}>
-            {page === 'dashboard' && <Dashboard onNavigate={navigate} />}
-            {page === 'home' && <SmartHomePage />}
-            {page === 'cameras' && <CamerasPage />}
-            {page === 'floorplan' && <FloorPlanPage />}
-            {page === 'calendar' && <CalendarPage />}
-            {page === 'money' && <MoneyPage />}
-            {page === 'tasks' && <TodoBoardPage title={t('nav.tasks')} lists={config?.tasks ?? []} />}
-            {page === 'rewards' && <RewardsPage />}
-            {page === 'lists' && <TodoBoardPage title={t('nav.lists')} lists={config?.lists ?? []} />}
-            {page === 'meals' && <TodoBoardPage title={t('nav.meals')} lists={config?.meals ?? []} />}
-            {page === 'photos' && <PhotosPage />}
-            {page === 'settings' && <SettingsPage />}
+          <PageBoundary key={page.id}>
+            <page.Component />
           </PageBoundary>
         </div>
       </div>
@@ -67,31 +58,32 @@ function Shell() {
   )
 }
 
-interface Session { authEnabled: boolean; authenticated: boolean; user: string | null }
-
-export default function App() {
-  const [session, setSession] = useState<Session | undefined>(undefined)
-
+function useSession() {
+  const [session, setSession] = useState<Session>()
   useEffect(() => {
     fetch('/api/session')
       .then((r) => r.json())
       .then(setSession)
       .catch(() => setSession({ authEnabled: true, authenticated: false, user: null }))
   }, [])
+  return session
+}
 
-  // login screen renders before the store/config load, so build a translator
-  // straight from the browser language
+export default function App() {
+  const session = useSession()
+  // the login screen comes before the config, so it speaks the browser's language
   const t = useMemo(() => makeT(resolveLanguage(undefined, navigator.language)), [])
 
-  if (session === undefined) return <div className="app-boot" />
+  if (!session) return <div className="app-boot" />
   if (session.authEnabled && !session.authenticated) {
-    const error = new URLSearchParams(location.search).has('auth_error')
-    return <LoginScreen t={t} error={error} />
+    return <LoginScreen t={t} error={new URLSearchParams(location.search).has('auth_error')} />
   }
 
   return (
-    <DashboardProvider>
-      <Shell />
+    <DashboardProvider messages={PLUGIN_MESSAGES}>
+      <PluginProviders>
+        <Shell />
+      </PluginProviders>
     </DashboardProvider>
   )
 }

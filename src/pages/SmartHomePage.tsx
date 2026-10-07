@@ -1,46 +1,32 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { useStore } from '../store'
-import { useFrigate } from '../frigate'
-import { FrigateMini } from '../components/FrigateTiles'
-import type { NamedEntity } from '../types'
+import React, { useState } from 'react'
+import { useTwoTapConfirm } from '../components/useTwoTapConfirm'
+import { useActivePlugins } from '../plugins/active'
+import { useStore, useTrackedEntities } from '../store'
+import type { AssignedEntity, SmartHomeCfg } from '../types'
+import { assigned } from '../util'
 import { BulbIcon, LockIcon, ShieldIcon, ThermoIcon, PoolIcon, AirIcon, SunIcon, MusicIcon, PlayIcon, PauseIcon, PrevTrackIcon, NextTrackIcon, SpeakerIcon } from '../icons'
+
+const TEMPERATURE_STEP = 0.5
 
 const num = (v: unknown): number | null => {
   const n = Number(v)
   return Number.isFinite(n) ? n : null
 }
 
-/** Two-tap confirmation: first tap arms for 3 s, second tap fires. */
-function useConfirm() {
-  const [armed, setArmed] = useState<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
-  useEffect(() => () => clearTimeout(timer.current), [])
-  return (key: string, fn: () => void) => {
-    if (armed === key) {
-      clearTimeout(timer.current)
-      setArmed(null)
-      fn()
-    } else {
-      clearTimeout(timer.current)
-      setArmed(key)
-      timer.current = setTimeout(() => setArmed(null), 3000)
-    }
-  }
-}
-
 function ClimateCard({ entity }: { entity: string }) {
   const { entityStates, callService, t } = useStore()
   const st = entityStates[entity]
-  if (!st) return <section className="card sh-climate"><h2 className="card-title">{t('home.climate')}</h2><div className="cal-empty">{t('state.unavailable')}</div></section>
+  if (st === null) return <section className="card sh-climate"><h2 className="card-title">{t('home.climate')}</h2><div className="cal-empty">{t('state.unavailable')}</div></section>
 
-  const current = num(st.attributes.current_temperature)
-  const target = num(st.attributes.temperature)
-  const modes = (st.attributes.hvac_modes as string[] | undefined) ?? []
-  const action = String(st.attributes.hvac_action ?? '')
-  const mode = st.state
+  const current = num(st?.attributes.current_temperature)
+  const target = num(st?.attributes.temperature)
+  const modes = (st?.attributes.hvac_modes as string[] | undefined) ?? []
+  const action = String(st?.attributes.hvac_action ?? '')
+  const mode = st?.state ?? ''
   const setTarget = (delta: number) => {
     if (target == null) return
-    callService('climate', 'set_temperature', { entity_id: entity, temperature: Math.round((target + delta) * 2) / 2 })
+    const temperature = Math.round((target + delta) / TEMPERATURE_STEP) * TEMPERATURE_STEP
+    callService('climate', 'set_temperature', { entity_id: entity, temperature })
   }
 
   return (
@@ -52,12 +38,12 @@ function ClimateCard({ entity }: { entity: string }) {
           <span className="sh-climate-action">{action ? t(`action.${action}`) : ''}</span>
         </div>
         <div className="sh-climate-target">
-          <button onClick={() => setTarget(-0.5)} aria-label="−0.5°">−</button>
+          <button onClick={() => setTarget(-TEMPERATURE_STEP)} aria-label={`−${TEMPERATURE_STEP}°`}>−</button>
           <span>
             <b>{target != null ? target.toFixed(1) : '--'}°</b>
             <small>{t('home.target')}</small>
           </span>
-          <button onClick={() => setTarget(0.5)} aria-label="+0.5°">+</button>
+          <button onClick={() => setTarget(TEMPERATURE_STEP)} aria-label={`+${TEMPERATURE_STEP}°`}>+</button>
         </div>
       </div>
       <div className="sh-modes">
@@ -82,7 +68,7 @@ const SENSOR_ICONS: Record<string, React.ReactNode> = {
   temp: <ThermoIcon />,
 }
 
-function SensorsCard({ sensors }: { sensors: NamedEntity[] }) {
+function SensorsCard({ sensors }: { sensors: AssignedEntity[] }) {
   const { entityStates, t } = useStore()
   return (
     <section className="card sh-sensors">
@@ -105,7 +91,7 @@ function SensorsCard({ sensors }: { sensors: NamedEntity[] }) {
   )
 }
 
-function LightsCard({ lights }: { lights: NamedEntity[] }) {
+function LightsCard({ lights }: { lights: AssignedEntity[] }) {
   const { entityStates, callService, t } = useStore()
   return (
     <section className="card sh-lights">
@@ -132,9 +118,9 @@ function LightsCard({ lights }: { lights: NamedEntity[] }) {
   )
 }
 
-function MediaCard({ players }: { players: NamedEntity[] }) {
+function MediaCard({ players }: { players: AssignedEntity[] }) {
   const { entityStates, callService, t } = useStore()
-  // volume being dragged, per player — shown immediately, committed on release
+  // shown while dragging, sent to HA on release
   const [dragVol, setDragVol] = useState<Record<string, number>>({})
 
   const commitVol = async (entity: string) => {
@@ -197,53 +183,42 @@ function MediaCard({ players }: { players: NamedEntity[] }) {
   )
 }
 
-function SecurityCard({ locks, alarm }: { locks: NamedEntity[]; alarm?: string }) {
+function SecurityCard({ locks, alarm }: { locks: AssignedEntity[]; alarm?: string }) {
   const { entityStates, callService, t } = useStore()
-  const confirm = useConfirm()
-  const [pending, setPending] = useState<string | null>(null)
+  const { armed, confirm } = useTwoTapConfirm()
+  const alarmState = alarm ? entityStates[alarm] : null
+  const alarmArmed = alarmState != null && alarmState.state !== 'disarmed'
 
-  const alarmSt = alarm ? entityStates[alarm] : null
-  const alarmArmed = alarmSt != null && alarmSt.state !== 'disarmed'
+  const toggleLock = (entity: string, locked: boolean) =>
+    confirm(`lock:${entity}`, () => callService('lock', locked ? 'unlock' : 'lock', { entity_id: entity }))
+  const toggleAlarm = () =>
+    confirm('alarm', () => callService('alarm_control_panel', alarmArmed ? 'alarm_disarm' : 'alarm_arm_home', { entity_id: alarm }))
 
   return (
     <section className="card sh-security">
       <h2 className="card-title">{t('home.security')}</h2>
       <div className="sh-tile-grid">
-        {locks.map((l) => {
-          const st = entityStates[l.entity]
+        {locks.map((lock) => {
+          const st = entityStates[lock.entity]
           const locked = st?.state === 'locked'
-          const key = `lock:${l.entity}`
+          const pending = armed === `lock:${lock.entity}`
           return (
             <button
-              key={l.entity}
-              className={`sh-tile sh-lock${locked ? ' locked' : ' unlocked'}${pending === key ? ' pending' : ''}`}
+              key={lock.entity}
+              className={`sh-tile sh-lock${locked ? ' locked' : ' unlocked'}${pending ? ' pending' : ''}`}
               disabled={!st}
-              onClick={() => { setPending(key); confirm(key, () => { setPending(null); callService('lock', locked ? 'unlock' : 'lock', { entity_id: l.entity }) }) }}
+              onClick={() => toggleLock(lock.entity, locked)}
             >
               <span className="sh-tile-icon"><LockIcon open={!locked} /></span>
-              <span className="sh-tile-value">
-                {pending === key ? t('home.confirm') : st ? t(locked ? 'lock.locked' : 'lock.unlocked') : '–'}
-              </span>
-              <span className="sh-tile-name">{l.name}</span>
+              <span className="sh-tile-value">{pending ? t('home.confirm') : st ? t(locked ? 'lock.locked' : 'lock.unlocked') : '–'}</span>
+              <span className="sh-tile-name">{lock.name}</span>
             </button>
           )
         })}
         {alarm && (
-          <button
-            className={`sh-tile sh-alarm state-${alarmSt?.state ?? 'unknown'}${pending === 'alarm' ? ' pending' : ''}`}
-            disabled={!alarmSt}
-            onClick={() => {
-              setPending('alarm')
-              confirm('alarm', () => {
-                setPending(null)
-                callService('alarm_control_panel', alarmArmed ? 'alarm_disarm' : 'alarm_arm_home', { entity_id: alarm })
-              })
-            }}
-          >
+          <button className={`sh-tile sh-alarm state-${alarmState?.state ?? 'unknown'}${armed === 'alarm' ? ' pending' : ''}`} disabled={!alarmState} onClick={toggleAlarm}>
             <span className="sh-tile-icon"><ShieldIcon /></span>
-            <span className="sh-tile-value">
-              {pending === 'alarm' ? t('home.confirm') : alarmSt ? t(`alarm.${alarmSt.state}`) : '–'}
-            </span>
+            <span className="sh-tile-value">{armed === 'alarm' ? t('home.confirm') : alarmState ? t(`alarm.${alarmState.state}`) : '–'}</span>
             <span className="sh-tile-name">{alarmArmed ? t('alarm.disarm') : t('alarm.arm')}</span>
           </button>
         )}
@@ -252,24 +227,33 @@ function SecurityCard({ locks, alarm }: { locks: NamedEntity[]; alarm?: string }
   )
 }
 
+const entitiesOf = (smartHome: SmartHomeCfg = {}) => [
+  smartHome.climate,
+  smartHome.alarm,
+  ...[smartHome.sensors, smartHome.lights, smartHome.locks, smartHome.mediaPlayers].flatMap((rows) => (rows ?? []).map((row) => row.entity)),
+]
+
 export function SmartHomePage() {
   const { config, t } = useStore()
-  const sh = config?.smartHome
-  // one slow poll here — the wall of snapshots lives on the Cameras page
-  const { state: frigate } = useFrigate(30_000)
-  const hasCameras = !!frigate?.enabled && frigate.cameras.length > 0
-  if (!sh || (!sh.climate && !hasCameras && !sh.sensors?.length && !sh.lights?.length && !sh.locks?.length && !sh.mediaPlayers?.length && !sh.alarm)) {
+  const homeCards = useActivePlugins().flatMap((plugin) => plugin.homeCards ?? [])
+  const smartHome = config?.smartHome ?? {}
+  const entities = entitiesOf(smartHome)
+  useTrackedEntities(entities)
+
+  if (!entities.some(Boolean) && !homeCards.length) {
     return <div className="card page-card"><p className="cal-empty">{t('home.notConfigured')}</p></div>
   }
 
+  const { climate, alarm } = smartHome
+  const [sensors, lights, mediaPlayers, locks] = [smartHome.sensors, smartHome.lights, smartHome.mediaPlayers, smartHome.locks].map(assigned)
   return (
     <div className="sh-grid">
-      {sh.climate && <ClimateCard entity={sh.climate} />}
-      {hasCameras && frigate && <FrigateMini state={frigate} />}
-      {!!sh.sensors?.length && <SensorsCard sensors={sh.sensors} />}
-      {!!sh.lights?.length && <LightsCard lights={sh.lights} />}
-      {!!sh.mediaPlayers?.length && <MediaCard players={sh.mediaPlayers} />}
-      {(!!sh.locks?.length || sh.alarm) && <SecurityCard locks={sh.locks ?? []} alarm={sh.alarm} />}
+      {climate && <ClimateCard entity={climate} />}
+      {homeCards.map((HomeCard, i) => <HomeCard key={i} />)}
+      {sensors.length > 0 && <SensorsCard sensors={sensors} />}
+      {lights.length > 0 && <LightsCard lights={lights} />}
+      {mediaPlayers.length > 0 && <MediaCard players={mediaPlayers} />}
+      {(locks.length > 0 || alarm) && <SecurityCard locks={locks} alarm={alarm} />}
     </div>
   )
 }

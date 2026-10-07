@@ -6,7 +6,7 @@ export function RewardsPage() {
   const { config, rewardValues, adjustReward, t } = useStore()
   return (
     <div className="rewards-page">
-      {config?.rewards.map((r) => {
+      {config?.rewards?.map((r) => {
         const v = r.entity ? rewardValues[r.entity] : null
         const live = r.entity != null && v != null
         return (

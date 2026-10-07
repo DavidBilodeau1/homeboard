@@ -1,4 +1,4 @@
-# ---- build the SPA ----
+# build the SPA
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -6,7 +6,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# ---- runtime ----
+# runtime
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production

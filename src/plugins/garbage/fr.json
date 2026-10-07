@@ -1,0 +1,8 @@
+{
+  "garbage.today": "aujourd'hui",
+  "garbage.tomorrow": "demain",
+  "garbage.layer": "Collectes",
+  "garbage.settings.hint": "Chaque ligne est un type de collecte : choisissez son capteur d'horaire (un capteur « timestamp » avec la date de la prochaine collecte) et une couleur pour le calendrier et l'alerte d'en-tête.",
+  "garbage.plugin.title": "Collectes",
+  "garbage.plugin.description": "Les jours de collecte au calendrier et dans l’en-tête, depuis des capteurs d’horaire."
+}

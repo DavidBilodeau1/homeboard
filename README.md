@@ -1,49 +1,59 @@
 # HomeBoard
 
-A self-hosted family dashboard (smart-calendar style) for **Home Assistant**, running
-outside the HA ecosystem as its own Docker container. Single-page app, live-reactive:
-it talks to the HA REST API through a small Node proxy (your token never reaches the
-browser) and receives instant updates over the HA WebSocket API.
+A self-hosted family dashboard (smart-calendar style) for **Home Assistant**,
+running as its own Docker container. It talks to the HA REST API through a small
+Node proxy, so your token never reaches the browser, and updates live over the
+HA WebSocket API.
+
+Home Assistant is the only connection HomeBoard needs. The core works with a
+stock HA install; everything that depends on another service or on a
+custom integration is an optional **plugin**, turned on in Settings.
 
 ## Features
 
-- **Dashboard** — month calendar + day events, photo slideshow, per-person task
-  progress, weather, meal/shopping lists, reward stars
-- **Calendar** — full month view with colored event chips per HA calendar
-- **Tasks / Lists / Meals** — HA `todo` lists: check off, add, delete items
-- **Rewards** — HA `counter` helpers with +/− buttons
-- **Cameras** — a [Frigate](https://frigate.video) wall: auto-refreshing
-  snapshots with an hour of motion activity under each, an alerts feed you can
-  acknowledge, live MJPEG + timelapse recap + event clips in one tap, and
-  detector/storage/uptime health at a glance
-- **Money** — [Expensave](https://github.com/algirdasc/expensave) transactions as
-  a calendar layer you can switch on and off, plus a weekly view of what is
-  safe to set aside
-- **Hockey** — your NHL team's next or current game from the
-  [NHL API](https://github.com/JayBlackedOut/hass-nhlapi) integration: puck-drop
-  countdown and TV channels before, live score, period clock, shots and last
-  goal during (with a full-tile celebration when your team scores), result after
-- **Photos** — fullscreen slideshow from a mounted folder
-- Live updates via WebSocket (state changes appear within ~1s), 5-min polling
-  fallback, full refresh on reconnect after an outage
-- **PWA** — installable from the browser ("Add to Home Screen") for a
-  chrome-less fullscreen app on tablets and phones
-- **Mock mode** — runs with demo data (including four fake Frigate cameras with
-  alerts and health) when `HA_URL`/`HA_TOKEN` are not set
+The core, using only built-in HA domains:
+
+- **Dashboard**: a drag-and-drop grid of tiles (calendar, photos, tasks, weather, meals, rewards)
+- **Calendar**: month view of your `calendar.*` entities, with per-screen layer toggles
+- **Tasks / Lists / Meals**: `todo.*` lists you can check off, add to and clean up
+- **Rewards**: `counter.*` helpers with +/− buttons
+- **Home**: thermostat, lights, sensors, media players, locks and alarm
+- **Photos**: a fullscreen slideshow from a mounted folder
+- Live updates over WebSocket, with a polling fallback and a full refresh after an outage
+- Light, dark, or follow-the-sun themes; English and French; installable as a PWA
+- **Mock mode**: demo data whenever `HA_URL`/`HA_TOKEN` are missing
+
+<img width="3024" height="1724" alt="HomeBoard dashboard" src="https://github.com/user-attachments/assets/0d4f500d-f985-4dfe-a8dd-cf9ab5a1bb69" />
+
+## Plugins
+
+| Plugin | Adds | Needs |
+| --- | --- | --- |
+| Cameras (Frigate) | Cameras page, Home card | a [Frigate](https://frigate.video) NVR: `FRIGATE_URL` |
+| Money (Expensave) | Money page and tile, calendar layer, bank statement import | an [Expensave](https://github.com/algirdasc/expensave) instance: `EXPENSAVE_URL`, `EXPENSAVE_EMAIL`, `EXPENSAVE_PASSWORD` |
+| Photos (Immich) | slideshow pictures from an album | an [Immich](https://immich.app) server: `IMMICH_URL`, `IMMICH_API_KEY` |
+| Hockey (NHL) | a live game tile | the [NHL API](https://github.com/JayBlackedOut/hass-nhlapi) HA integration |
+| Garbage collection | pickup days on the calendar and in the header | timestamp sensors with the next pickup date |
+| Air quality | an AQI tile and a header alert | an air quality index sensor |
+| Floor plan | a to-scale plan of your home with devices on it | nothing beyond HA |
+
+Turn plugins on in **Settings → Plugins**. A plugin whose server connection is
+missing says which environment variables to set. Each enabled plugin gets its
+own settings tab, and its tiles appear in the dashboard's *Add tile* menu.
 
 ## Quick start (Docker)
 
 ```bash
-cp .env.example .env             # then paste your HA long-lived access token
-cp config/config.example.json config/config.json   # then edit for your entities
-docker compose up -d            # pulls ghcr.io/davidbilodeau1/homeboard:latest
-# open http://<server>:8090
+cp .env.example .env     # set HA_URL and HA_TOKEN
+docker compose up -d     # pulls ghcr.io/davidbilodeau1/homeboard:latest
+# open http://<server>:8090 and configure everything in Settings
 ```
 
-Add `--build` to build from source instead of pulling the published image.
+Add `--build` to build from source. Create the token in HA under your profile →
+**Security** → **Long-lived access tokens**.
 
-Get a token in HA: click your user (bottom-left) → **Security** →
-**Long-lived access tokens** → *Create token*.
+To try it without Home Assistant, copy `config/config.example.json` to
+`config/config.json` and run with `MOCK=1`: every plugin has demo data except Immich.
 
 ### Environment variables
 
@@ -51,221 +61,116 @@ Get a token in HA: click your user (bottom-left) → **Security** →
 | --- | --- | --- |
 | `HA_URL` | — | Home Assistant base URL, e.g. `https://ha.example.com` |
 | `HA_TOKEN` | — | Long-lived access token |
+| `PUBLIC_URL` | — | HomeBoard's own external URL; **setting it requires login** |
+| `AUTH_ENABLED` | auto | `0` keeps login off even when `PUBLIC_URL` is set |
+| `SESSION_SECRET` | auto | Cookie-signing secret (generated and persisted if unset) |
+| `EDITOR_ENABLED` | `1` | `0` makes Settings read-only, e.g. on a wall panel |
+| `MOCK` | `0` | `1` forces demo data |
 | `PORT` | `8090` | HTTP port inside the container |
-| `MOCK` | `0` | `1` forces demo data (also used when URL/token missing) |
 | `CONFIG_PATH` | `/app/config/config.json` | Dashboard configuration |
-| `PHOTOS_DIR` | `/app/photos` | Local folder fallback for slideshow images |
-| `IMMICH_URL` | — | Immich base URL, e.g. `https://photos.example.com` |
-| `IMMICH_API_KEY` | — | Immich API key (Account Settings → API Keys) |
-| `IMMICH_ALBUM` | `Wallpanel` | Immich album name to use for the slideshow |
-| `FRIGATE_URL` | — | Frigate base URL, e.g. `http://frigate.local:5000` |
-| `FRIGATE_USER` | — | Frigate username (only if Frigate's own auth is on) |
-| `FRIGATE_PASSWORD` | — | Frigate password |
-| `FRIGATE_TOKEN` | — | JWT instead of user/password |
-| `EXPENSAVE_URL` | — | Expensave base URL, e.g. `https://expensave.example.com` |
-| `EXPENSAVE_EMAIL` | — | Expensave account HomeBoard logs in with |
-| `EXPENSAVE_PASSWORD` | — | that account's password |
-| `EDITOR_ENABLED` | `1` | `0` makes the Settings config editor read-only |
-| `PUBLIC_URL` | — | HomeBoard's own external URL; **setting it enables login** |
-| `AUTH_ENABLED` | auto | `0` forces auth off even when `PUBLIC_URL` is set |
-| `SESSION_SECRET` | auto | Cookie-signing secret (auto-generated & persisted if unset) |
+| `PHOTOS_DIR` | `/app/photos` | Local slideshow folder |
 
-## Authentication — "Log in with Home Assistant"
+Plugin connections: `FRIGATE_URL`, `FRIGATE_USER`, `FRIGATE_PASSWORD`,
+`FRIGATE_TOKEN`, `EXPENSAVE_URL`, `EXPENSAVE_EMAIL`, `EXPENSAVE_PASSWORD`,
+`IMMICH_URL`, `IMMICH_API_KEY`. Secrets stay in the environment, never in
+`config.json`, which the browser reads.
 
-HomeBoard has no accounts of its own; it authenticates against **your** Home
-Assistant using its OAuth2 (IndieAuth) flow — the same "Log in with Home
-Assistant" your HA companion apps use.
+## Authentication
 
-**Enabling it:** set `PUBLIC_URL` to HomeBoard's own externally reachable URL
-(e.g. `https://homeboard.example.com` — *not* your HA URL) and redeploy. Auth
-turns on automatically. With `PUBLIC_URL` unset, the dashboard stays open (fine
-for a trusted LAN, unsafe for public hosting).
+With `PUBLIC_URL` set, visitors log in with Home Assistant's own OAuth2
+(IndieAuth) flow: HomeBoard redirects to your HA login, exchanges the code, and
+sets a signed, HTTP-only session cookie (60 days). Every API route, the photo
+proxy and the live WebSocket then require that session. Anyone who can log in
+to your HA can see the dashboard. Without `PUBLIC_URL` the dashboard is open, so
+keep it on a trusted LAN.
 
-**How it works:**
-1. An unauthenticated visitor gets a login screen with one button.
-2. It redirects to your HA login (`/auth/authorize`); the user signs in there.
-3. HA redirects back to `PUBLIC_URL/auth/callback`; the server exchanges the
-   code for a token to confirm the login, then sets a signed, HTTP-only session
-   cookie (60-day, `Secure` over HTTPS).
-4. Every `/api/*` request, the photo proxy, and the live WebSocket require that
-   session — so none of your HA data is reachable without logging in.
+`PUBLIC_URL` must match the URL users visit, HA must be reachable at `HA_URL`
+from both the browser and the container, and HomeBoard should be served over HTTPS.
 
-Anyone with a login on your Home Assistant can access the dashboard (it then
-serves data via HomeBoard's own service token, so individual HA permissions
-don't restrict what's shown — appropriate for a family dashboard). Log out from
-**Settings → Account**. The session secret is stored at
-`config/.hb_session_secret` so logins survive restarts.
+## Configuration
 
-> Requirements: `PUBLIC_URL` must exactly match the URL users visit, and your HA
-> must be reachable at `HA_URL` from both the browser (for login) and the
-> container (for the token exchange). HomeBoard should be served over HTTPS.
+`config/config.json` is mounted as a volume. A missing file is an empty
+configuration, so a fresh install starts from Settings. Settings validates every
+save on the server, keeps the previous file as `config.json.bak`, and applies it
+immediately. You can also edit the file by hand and reload.
 
-## Configuration (`config/config.json`)
+| Key | Purpose |
+| --- | --- |
+| `locale`, `language`, `theme` | date formatting, UI language (`en`, `fr`), default theme (`auto`, `light`, `dark`, `sun`) |
+| `weatherEntity` | a `weather.*` entity |
+| `calendars` | `{ entity, name, color }` per `calendar.*` entity |
+| `tasks`, `meals`, `lists` | `{ name, entity, color }` rows backed by `todo.*` lists |
+| `rewards` | `{ name, entity }` rows backed by `counter.*` helpers |
+| `people` | names shown in the header, matched to `person.*` entities |
+| `photos.intervalSeconds` | slideshow speed |
+| `smartHome` | `climate`, `alarm`, and `sensors`, `lights`, `locks`, `mediaPlayers` rows |
+| `dashboard` | grid size and tile positions, saved by the dashboard editor |
+| `plugins.<id>` | `{ enabled, ...settings }` for each plugin |
 
-Mounted as a volume. Two ways to edit:
+Configs from before plugins existed keep working: their top-level `frigate`,
+`expensave`, `hockey`, `garbage`, `airQuality` and `floorPlan` sections are read
+as enabled plugins, and the next save writes them under `plugins`.
 
-- **Settings page** — tabbed visual editor with HA entity dropdowns, color
-  pickers, row add/remove/reorder, and a raw-JSON tab. Saving validates the
-  config server-side (`PUT /api/config`), keeps the previous version as
-  `config.json.bak`, writes atomically, and applies immediately — no restart.
-  Disable with `EDITOR_ENABLED=0` (HomeBoard has no auth: keep it LAN/VPN-only
-  either way).
-- **By hand** — edit the file and reload the page.
+## Plugin notes
 
-- `weatherEntity` — an HA `weather.*` entity
-- `calendars` — HA `calendar.*` entities with a display color each
-- `tasks` — rows of the Tasks card: `{ name, entity (todo.*), color }`
-- `meals` — rows of the Meals card, each backed by a `todo.*` list
-- `lists` — lists shown on the Lists page
-- `rewards` — `{ name, entity }` where entity is a `counter.*` helper
-  (create one in HA: Settings → Devices & services → Helpers → Counter);
-  shows `–` until the helper exists
-- `smartHome.mediaPlayers` — `{ name, entity (media_player.*) }` rows shown as
-  a Media card on the Home page: now playing, play/pause, previous/next,
-  volume slider
-- `expensave` — the Money integration: `calendars` (`{ id, name?, color? }` —
-  omit to follow every calendar on the account), `currency`, `horizonDays`,
-  `buffer`, `weeklyGoal`, `showInCalendar`, `importEveryDays` (bank statement
-  cadence, default 14)
-- `people` — names for the avatar cluster in the top bar
-- `photos.intervalSeconds` — slideshow speed
-- `locale` — e.g. `en-US` or `fr-CA` (affects date/time formatting)
-- `language` — UI language, `en` or `fr` (defaults to the `locale` prefix,
-  then the browser language)
-- `theme` — default theme: `auto`, `light`, `dark`, or `sun` (dark after sunset,
-  follows HA's `sun.sun`); a device-level choice made with the top-bar toggle or
-  Settings overrides it
+**Cameras (Frigate).** Cameras come from Frigate's own config. Settings picks
+and orders them and tunes the snapshot refresh, polling and alert feed size. If
+Frigate's authentication is on, set `FRIGATE_USER`/`FRIGATE_PASSWORD` (HomeBoard
+renews its token) or a `FRIGATE_TOKEN`. The browser only reaches Frigate through
+an allow-list of media paths, with camera names checked against Frigate.
 
-## Cameras (Frigate)
+**Money (Expensave).** Each Expensave calendar becomes a calendar layer. The
+Money page shows what is *safe to set aside*: today's cleared balance, minus
+charges not cleared yet, walked day by day through everything scheduled until
+the horizon. The answer is the **lowest** point along the way minus your buffer,
+since a paycheque that lands after rent cannot pay it. The *Bank statement*
+card takes a CSV export (date, description, and amount or withdrawal/deposit
+columns), shows what it would change, and on confirmation confirms planned
+entries, adds new ones, removes or keeps unmatched ones, and records the bank's
+balance. Imported rows are tagged, so overlapping statements never duplicate.
 
-Set `FRIGATE_URL` and the **Cameras** page comes alive — no camera list to
-maintain, since HomeBoard reads Frigate's own config. If Frigate's built-in
-authentication is enabled, add `FRIGATE_USER`/`FRIGATE_PASSWORD` (HomeBoard logs
-in once and refreshes the token by itself) or paste a `FRIGATE_TOKEN`.
+**Photos (Immich).** Set the album name in Settings. The server pages through
+the album, shuffles it, and proxies preview images so HEIC originals display
+and the API key stays on the server. Without it, the slideshow uses `photos/`.
 
-What the page shows:
+**Hockey (NHL).** Pick the integration's sensor (e.g. `sensor.nhl_mtl`) and
+optionally your team. The tile shows a countdown before the game, the live
+score, clock, shots and last goal during it, and the result after.
 
-- **Camera wall** — `latest.jpg` snapshots refreshed every few seconds (cheap:
-  no transcoding, no ffmpeg), each with the last hour of motion activity drawn
-  as a sparkline, an unread-alert badge, and the newest detection with its label
-- **Alerts feed** — Frigate *review items*, newest first, unread marked; hover
-  plays the animated preview; one tap acknowledges it (`POST /reviews/viewed`)
-- **Health strip** — new/24 h alert and detection counts, cameras up, detector
-  inference time, recordings disk usage, uptime and version (with an update hint)
-- **Tap a camera** — fullscreen live MJPEG with Frigate's own bounding boxes,
-  zones and timestamp burnt in; a **Last 30 min** timelapse (`preview.mp4`); and
-  a strip of recent events whose clips play in place
+**Garbage collection.** One row per collection: a timestamp sensor with the next
+pickup date, and a color. Pickups appear on the calendar, and in the header the
+day before and the day of.
 
-Tuning lives under `frigate` in `config/config.json` (or Settings → Cameras):
+**Air quality.** Pick an AQI sensor and the threshold above which the header
+shows an alert.
 
-```json
-"frigate": {
-  "cameras": ["front_door", "driveway"],
-  "refreshSeconds": 8,
-  "pollSeconds": 15,
-  "alertLimit": 20
-}
-```
+**Floor plan.** Rooms, floors and exterior features live under
+`plugins.floorPlan` (`house`, `floors`, `exterior`, dimensions in `[feet, inches]`).
+On the page, *Rearrange* drags rooms (they snap to walls and each other), edits
+dimensions, and places any HA entity as a tappable device.
 
-Omit `cameras` to show every camera Frigate has enabled; list them to pick and
-order the wall. `refreshSeconds` is the snapshot cadence, `pollSeconds` how often
-alerts/health are re-fetched, `alertLimit` how deep the feed goes.
+## Writing a plugin
 
-Nothing reaches Frigate from the browser: images, clips and JSON all travel
-through `/api/frigate/*`, which allow-lists exactly the media paths the UI needs
-(`latest.jpg`, event snapshots/thumbnails/clips, review previews, `preview.mp4`,
-the MJPEG feed) and validates every camera name against Frigate's real list.
+A plugin has a client half in `src/plugins/<id>/` and, when it needs one, a
+server half in `server/plugins/`. Register them in `src/plugins/registry.ts` and
+`server/plugins/index.js`.
 
-## Money (Expensave)
+The client `Plugin` (`src/plugins/types.ts`) declares its title, translations,
+and any of: `pages`, dashboard `tiles`, `homeCards`, a `TopBarItem`, calendar
+extensions (`Legend`, `DayBadge`, `DayDetails`), a `Provider` for shared state,
+and a `Settings` panel. Entity-based plugins use `useEntityState` and
+`useTrackedEntities` from the store to get live states.
 
-Set `EXPENSAVE_URL`, `EXPENSAVE_EMAIL` and `EXPENSAVE_PASSWORD` and the
-**Money** page appears, fed by your own
-[Expensave](https://github.com/algirdasc/expensave) instance. HomeBoard only
-writes to it when you import a bank statement (below); it logs in server-side (Expensave's access tokens last ten minutes, so it
-just logs in again when one expires) and never lets the browser see the URL or
-the credentials.
-
-**On the calendar.** Each Expensave calendar becomes a layer: every day cell
-shows that day's net, and the day panel lists the transactions behind it.
-Clicking a chip in the calendar legend switches a layer off — Expensave
-calendars, HA calendars and garbage collections alike. The choice is per screen
-(kept in `localStorage`), so the wall panel can hide money while your phone
-shows it. `expensave.showInCalendar: false` starts the layer hidden everywhere.
-
-**Safe to set aside.** The number the page is built around is *the most you can
-move to savings right now*:
-
-```
-cleared balance today
-− charges that have not cleared
-± every transaction scheduled between tomorrow and the horizon, day by day
-= the LOWEST the account gets along the way      ← not the balance at the end
-− the buffer you keep
-```
-
-Taking the low point matters: a paycheque that lands after next week's rent
-cannot pay for it. The breakdown on the page names the day of that low point,
-and `Projected on …` shows where the balance ends up once everything has landed.
-Tune `horizonDays` (default 14) and `buffer` (default 0) in Settings → Money;
-set `weeklyGoal` to get a progress bar against a weekly target.
-
-**Week by week** shows money in, money out and the net for the last five weeks
-and the next three, with the current week highlighted, plus what a typical
-recent week actually leaves over.
-
-**Bank statement.** Every 14 days, download the last 14 days of the chequing
-account as CSV (Desjardins' export works as is; other banks with a date,
-description and amount or withdrawal/deposit column should too) and drop it on
-the Money page's *Bank statement* card. Nothing is written until you confirm the
-review, which shows, for the statement's dates:
-
-- **planned entries confirmed by the bank**: same sign, amount within a few
-  cents, date within 4 days (or two payments to the same payee that add up).
-  The entry keeps its label and category and takes the bank's date and amount.
-- **new transactions**: added as confirmed. Their category comes from
-  Expensave's memory of that label, so recategorising once sticks, otherwise
-  from a keyword guess.
-- **planned entries the bank never saw**: *Remove* (did not happen, or a budget
-  line such as groceries that the real purchases now replace) or *Still coming*
-  (marked unconfirmed, so the set-aside number keeps reserving it). Entries from
-  the last two days default to *Still coming*.
-- **the balance your bank shows**, saved as an Expensave balance update at the
-  end of the statement, so *Safe to set aside* starts from the real balance.
-
-Imported rows carry a `[hb:…]` tag in their description, so uploading an
-overlapping statement never duplicates anything. The card shows when the next
-statement is due and warns about days no statement covered. The last import is
-recorded in `config/bank-import.json`. Read-only panels (`EDITOR_ENABLED=0`)
-can't import.
-
-Without Expensave configured the page and the tile simply say so; in mock mode
-(`MOCK=1`) a demo ledger with a household and a personal calendar drives
-everything.
-
-## Preview
-
-<img width="3024" height="1724" alt="image" src="https://github.com/user-attachments/assets/0d4f500d-f985-4dfe-a8dd-cf9ab5a1bb69" />
-
+The server plugin can `validate(settings)`, declare the external `service` it
+needs, provide a `router` (served at `/api/plugins/<id>` while enabled) and a
+slideshow `photoSource`.
 
 ## Translations
 
-UI strings live in `src/i18n/<lang>.json` (flat keys, `{var}` interpolation,
-`_one`/`_other` suffixes for plurals). To add a language: copy `en.json`, translate,
-register it in `src/i18n/index.ts`, rebuild. Missing keys fall back to English.
-
-## Photos
-
-Photo sources, in priority order:
-
-1. **Immich** — set `IMMICH_URL` + `IMMICH_API_KEY` (+ `IMMICH_ALBUM`, default
-   `Wallpanel`). The server resolves the album by name (owned or shared), pages
-   through it with `POST /api/search/metadata`, shuffles the result (re-shuffled
-   every 5 min when the album list cache expires), and proxies each image through
-   `GET /api/immich/<assetId>` using Immich's `thumbnail?size=preview` rendition —
-   so HEIC originals display fine and the API key never reaches the browser.
-2. **Local folder** — drop `.jpg/.png/.webp/...` files into `photos/`
-   (mounted read-only into the container).
-3. Bundled placeholder art.
+UI strings live in `src/i18n/<lang>.json` and in each plugin's `en.json`/`fr.json`
+(flat keys, `{var}` interpolation, `_one`/`_other` plurals). To add a language,
+add a file next to each `en.json` and register it in `src/i18n/index.ts`.
+Missing keys fall back to English.
 
 ## Local development
 
@@ -273,61 +178,35 @@ Photo sources, in priority order:
 npm install
 npm run start          # backend on :8090 (mock mode without HA_URL/HA_TOKEN)
 npm run dev            # Vite dev server on :5173, proxies /api and /ws
-npm run typecheck      # tsc --noEmit
-npm run lint           # eslint
-npm test               # vitest (event normalization + config validation)
-npm run icons          # regenerate the PWA icons in public/icons/
+npm run typecheck
+npm run lint
+npm test
+npm run icons          # regenerate the PWA icons
 ```
 
-CI (GitHub Actions) runs typecheck, lint, tests and the build on every push/PR.
+CI runs typecheck, lint, tests and the build on every push and pull request.
 
-## Releases & automatic updates
+## Releases
 
-[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)
-builds `ghcr.io/davidbilodeau1/homeboard` (linux/amd64) and tags it by trigger:
-
-| Trigger | Tags pushed | Effect on the server |
-| --- | --- | --- |
-| push to `main` | `edge`, `sha-<short>` | nothing moves |
-| push of a `v*` tag | `latest`, `1.2.3`, `1.2` | Watchtower rolls it out |
-
-So cutting a release is:
+[`docker-publish.yml`](.github/workflows/docker-publish.yml) publishes
+`ghcr.io/davidbilodeau1/homeboard`: pushes to `main` as `edge`, `v*` tags as
+`latest` and the version. `docker-compose.yml` follows `latest`, so Watchtower
+rolls a release out on its own.
 
 ```bash
-npm version minor -m 'release %s'   # bumps package.json and creates the tag
+npm version minor -m 'release %s'
 git push && git push --tags
-```
-
-`docker-compose.yml` tracks `:latest`, so a **Watchtower** container on the
-server pulls the new image and recreates HomeBoard on its next check — no manual
-deploy step. The compose file also carries
-`com.centurylinklabs.watchtower.enable=true`, which only matters if your
-Watchtower runs with `WATCHTOWER_LABEL_ENABLE=true`.
-
-> If the GHCR package is private, run `docker login ghcr.io` on the server with a
-> PAT that has `read:packages` (Watchtower reuses the host's Docker
-> credentials), or make the package public: GitHub → Packages → homeboard →
-> Package settings → Change visibility.
-
-To develop against your real HA instance:
-
-```bash
-HA_URL=https://ha.example.com HA_TOKEN=xxx npm run start
 ```
 
 ## Architecture
 
 ```
-browser ── SPA (React/Vite) ── /api/ha/*        ──► Node/Express proxy ──► HA REST API
-        │                     /api/frigate/*   ──► Frigate proxy      ──► Frigate API
-        │                     /api/expensave/* ──► Expensave proxy    ──► Expensave API
-        └───────── /ws ◄────────────────────────── WebSocket bridge ◄─── HA WebSocket API
+browser ── SPA (React/Vite) ── /api/ha/*          ──► Node/Express ──► Home Assistant REST API
+        │                     /api/plugins/<id>/* ──► plugin routers ──► Frigate, Expensave, Immich…
+        └───────── /ws ◄────────────────────────── WebSocket bridge ◄── Home Assistant WebSocket API
 ```
 
-The proxy adds the `Authorization: Bearer` header server-side, so the token is
-never exposed to clients. The WebSocket bridge subscribes to `state_changed`
-events and notifies browsers when a `todo.`, `calendar.`, `weather.`, `counter.`,
-`input_number.` or `person.` entity changes; the SPA then refetches just that slice.
-
-> If HA uses a self-signed certificate, uncomment
-> `NODE_TLS_REJECT_UNAUTHORIZED: "0"` in `docker-compose.yml`.
+The server forwards a state change to browsers when it concerns a core domain
+(`todo`, `calendar`, `weather`, `counter`, `input_number`, `person`, `sun`) or an
+entity named in the configuration; the browser then refetches only that entity
+or slice.

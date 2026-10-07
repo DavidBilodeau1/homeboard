@@ -28,8 +28,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # main pushes  -> :edge, :sha-abc1234   (nothing on the wall panel moves)
-      # v1.2.3 tags  -> :latest, :1.2.3, :1.2 (this is what the server follows)
+      # main → :edge and :sha-<short>; v1.2.3 → :latest, :1.2.3 and :1.2
       - name: Derive tags
         id: meta
         uses: docker/metadata-action@v5

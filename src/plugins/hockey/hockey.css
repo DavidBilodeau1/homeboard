@@ -1,0 +1,155 @@
+.nhl-card {
+  --team-ink: var(--team);
+  position: relative; display: flex; flex-direction: column; gap: 8px;
+  container-type: size;
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--team) 13%, transparent), transparent 60%),
+    radial-gradient(90% 80% at 100% 100%, color-mix(in srgb, var(--opp) 9%, transparent), transparent 55%),
+    var(--card);
+}
+.nhl-card::before {
+  content: ''; position: absolute; inset: 0 0 auto; height: 5px;
+  background: linear-gradient(90deg, var(--team), color-mix(in srgb, var(--team) 40%, var(--opp)));
+}
+[data-theme='dark'] .nhl-card { --team-ink: color-mix(in srgb, var(--team) 55%, #fff); }
+.nhl-card[role='link'] { cursor: pointer; }
+.nhl-card.nhl-empty { background: var(--card); }
+.nhl-card.nhl-empty::before { display: none; }
+.nhl-card .card-title { display: flex; align-items: center; gap: 8px; }
+.nhl-off {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  color: var(--muted); font-weight: 700; font-size: 0.9375rem;
+}
+
+.nhl-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 1.6rem; }
+.nhl-status {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+}
+.nhl-status.soon { color: var(--team-ink); }
+.nhl-status.live {
+  padding: 3px 10px 3px 8px; border-radius: 999px; background: #d9313d; color: #fff; letter-spacing: 0.08em;
+}
+.nhl-status-sub { font-weight: 700; opacity: 0.85; letter-spacing: 0.04em; }
+.nhl-dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: aq-pulse 1.2s ease-in-out infinite; }
+.nhl-tag {
+  font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 999px; color: var(--team-ink);
+  background: color-mix(in srgb, var(--team) 14%, transparent);
+}
+
+.nhl-matchup {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px;
+}
+.nhl-team { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.nhl-logo {
+  width: clamp(48px, 30cqmin, 120px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+}
+.nhl-logo img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.12)); user-select: none; }
+.nhl-logo span { font-size: 1.5rem; font-weight: 800; color: var(--muted); }
+.nhl-abbrev { font-size: 1rem; font-weight: 800; letter-spacing: 0.04em; color: var(--muted); position: relative; }
+.nhl-team.tracked .nhl-abbrev { color: var(--team-ink); }
+.nhl-team.tracked .nhl-abbrev::after {
+  content: ''; position: absolute; left: 15%; right: 15%; bottom: -3px; height: 3px; border-radius: 2px; background: var(--team);
+}
+.nhl-record { font-size: 0.75rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.nhl-center { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 4px; text-align: center; }
+.nhl-at { font-size: 0.8125rem; font-weight: 800; color: var(--faint); text-transform: uppercase; letter-spacing: 0.08em; }
+.nhl-time { font-size: clamp(1.25rem, 11cqmin, 2.25rem); font-weight: 800; line-height: 1.05; white-space: nowrap; }
+.nhl-countdown {
+  margin-top: 2px; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+  font-size: 0.8125rem; font-weight: 800; color: var(--team-ink);
+  background: color-mix(in srgb, var(--team) 13%, transparent);
+}
+.nhl-score {
+  display: flex; align-items: baseline; gap: 0.25em;
+  font-size: clamp(2rem, 20cqmin, 4rem); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.nhl-pts { color: var(--muted); transition: color 0.3s; }
+.nhl-pts.ahead { color: var(--ink); }
+.nhl-pts.ours { color: var(--team-ink); }
+.nhl-dash { color: var(--faint); font-weight: 700; }
+.nhl-clock { font-size: 0.9375rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
+.nhl-result {
+  padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase; color: #fff;
+}
+.nhl-result.win { background: var(--in); }
+.nhl-result.loss { background: var(--muted); }
+
+.nhl-details {
+  display: flex; flex-direction: column; gap: 7px;
+  padding-top: 9px; border-top: 1px solid var(--line); font-size: 0.8125rem; font-weight: 700;
+}
+.nhl-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.nhl-venue { font-weight: 800; }
+.nhl-tv { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.nhl-tv-label { color: var(--muted); font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-right: 2px; }
+.nhl-chip {
+  padding: 2px 7px; border-radius: 6px; font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.03em;
+  background: var(--line); color: var(--ink);
+}
+.nhl-chip.strong { background: color-mix(in srgb, var(--team) 16%, transparent); color: var(--team-ink); }
+.nhl-series { color: var(--team-ink); font-weight: 800; }
+
+.nhl-sog { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
+.nhl-sog-n { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 1.4em; text-align: center; }
+.nhl-sog-bar {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--away) var(--split), var(--home) var(--split));
+  transition: background 0.4s;
+}
+.nhl-sog-label {
+  grid-column: 1 / -1; margin-top: -3px; text-align: center;
+  font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+}
+.nhl-last { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nhl-last-label { font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.nhl-last.ours .nhl-last-label { color: var(--team-ink); }
+.nhl-last-who { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 0.9375rem; font-weight: 800; }
+.nhl-last-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nhl-last-name small { font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+.nhl-jersey {
+  flex: none; min-width: 1.7rem; height: 1.7rem; padding: 0 4px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.8125rem; background: var(--ink); color: var(--card);
+}
+.nhl-last.ours .nhl-jersey { background: var(--team); color: #fff; }
+.nhl-assists { color: var(--muted); font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* last five minutes of regulation: a slow team-colour pulse around the tile */
+.nhl-card.crit { animation: nhl-crit 2.4s ease-in-out infinite; }
+@keyframes nhl-crit {
+  0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--team) 35%, transparent) inset; }
+  50% { box-shadow: 0 0 0 3px var(--team) inset; }
+}
+
+/* goal celebration overlay */
+.nhl-goal-banner {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--team) 80%, #fff), var(--team) 70%);
+  color: #fff; text-align: center; animation: nhl-goal-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.nhl-goal-word {
+  font-size: clamp(2.2rem, 26cqmin, 5.5rem); font-weight: 900; letter-spacing: 0.04em; line-height: 1;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.25); animation: nhl-goal-beat 0.9s ease-in-out 0.5s 4;
+}
+.nhl-goal-who { font-size: 1.125rem; font-weight: 800; opacity: 0.95; }
+@keyframes nhl-goal-in { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
+@keyframes nhl-goal-beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+/* small tiles: keep the matchup, drop the extras */
+@container (max-height: 250px) {
+  .nhl-details { display: none; }
+  .nhl-record { display: none; }
+}
+@container (max-width: 300px) {
+  .nhl-record, .nhl-tag { display: none; }
+  .nhl-countdown { font-size: 0.75rem; padding: 2px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nhl-card.crit, .nhl-goal-word, .nhl-goal-banner, .nhl-dot { animation: none; }
+}

@@ -1,0 +1,12 @@
+{
+  "air.title": "Air Quality",
+  "air.good": "Good",
+  "air.unsafe": "Unsafe",
+  "air.stayInside": "Stay inside",
+  "air.settings.entity": "AQI sensor",
+  "air.settings.name": "Display name",
+  "air.settings.threshold": "Safe up to (AQI)",
+  "air.settings.hint": "Pick the air-quality index sensor. Above the threshold, a red alert appears in the header and the tile turns to a warning.",
+  "air.plugin.title": "Air quality",
+  "air.plugin.description": "An air-quality tile, and a header alert when the air is unsafe."
+}

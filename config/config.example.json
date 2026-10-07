@@ -1,7 +1,7 @@
 {
   "locale": "en-US",
   "language": "en",
-  "theme": "sun",
+  "theme": "auto",
   "weatherEntity": "weather.home",
   "calendars": [
     { "entity": "calendar.family", "name": "Family", "color": "#C33C54" },
@@ -9,8 +9,8 @@
     { "entity": "calendar.work", "name": "Work", "color": "#E8A13C" }
   ],
   "tasks": [
-    { "name": "Person A", "entity": "todo.person_a", "color": "#A9C0F5" },
-    { "name": "Person B", "entity": "todo.person_b", "color": "#F5AFC0" },
+    { "name": "Alex", "entity": "todo.alex", "color": "#A9C0F5" },
+    { "name": "Sam", "entity": "todo.sam", "color": "#F5AFC0" },
     { "name": "House", "entity": "todo.house", "color": "#A8DFB2" }
   ],
   "meals": [
@@ -18,25 +18,25 @@
   ],
   "lists": [
     { "name": "Groceries", "entity": "todo.groceries" },
-    { "name": "Shopping List", "entity": "todo.shopping_list" }
+    { "name": "Shopping list", "entity": "todo.shopping_list" }
   ],
   "rewards": [
-    { "name": "Person A", "entity": "counter.person_a_stars" },
-    { "name": "Person B", "entity": "counter.person_b_stars" }
+    { "name": "Alex", "entity": "counter.alex_stars" },
+    { "name": "Sam", "entity": "counter.sam_stars" }
   ],
-  "people": ["Person A", "Person B"],
+  "people": ["Alex", "Sam"],
   "photos": { "intervalSeconds": 15 },
   "smartHome": {
     "climate": "climate.thermostat",
     "sensors": [
       { "name": "Pool", "entity": "sensor.pool_temperature", "icon": "pool" },
-      { "name": "Air quality", "entity": "sensor.air_quality_index", "icon": "air" },
       { "name": "UV", "entity": "sensor.uv_index", "icon": "sun" },
       { "name": "Feels like", "entity": "sensor.feels_like_temperature", "icon": "temp" }
     ],
     "lights": [
       { "name": "Living room", "entity": "light.living_room" },
-      { "name": "Kitchen", "entity": "light.kitchen" }
+      { "name": "Kitchen", "entity": "light.kitchen" },
+      { "name": "Bedroom", "entity": "light.bedroom" }
     ],
     "locks": [
       { "name": "Front door", "entity": "lock.front_door" }
@@ -47,73 +47,32 @@
     ],
     "alarm": "alarm_control_panel.home_alarm"
   },
-  "frigate": {
-    "cameras": ["front_door", "driveway", "backyard"],
-    "refreshSeconds": 8,
-    "pollSeconds": 15,
-    "alertLimit": 20
-  },
-  "expensave": {
-    "calendars": [
-      { "id": 1, "name": "Household", "color": "#2e9e8f" },
-      { "id": 2, "name": "Personal", "color": "#8e6cd6" }
-    ],
-    "currency": "CAD",
-    "horizonDays": 14,
-    "buffer": 500,
-    "weeklyGoal": 200,
-    "showInCalendar": true,
-    "importEveryDays": 14
-  },
   "dashboard": {
     "cols": 12,
     "rows": 9,
     "tiles": [
-      { "id": "calendar", "x": 0, "y": 0, "w": 6, "h": 9 },
-      { "id": "weather", "x": 6, "y": 0, "w": 3, "h": 4 },
-      { "id": "meals", "x": 9, "y": 0, "w": 3, "h": 4 },
-      { "id": "photo", "x": 6, "y": 4, "w": 4, "h": 5 },
-      { "id": "rewards", "x": 10, "y": 4, "w": 2, "h": 5 }
+      { "id": "calendar", "x": 0, "y": 0, "w": 3, "h": 9 },
+      { "id": "photo", "x": 3, "y": 0, "w": 6, "h": 5 },
+      { "id": "tasks", "x": 9, "y": 0, "w": 3, "h": 5 },
+      { "id": "weather", "x": 3, "y": 5, "w": 3, "h": 4 },
+      { "id": "meals", "x": 6, "y": 5, "w": 3, "h": 4 },
+      { "id": "rewards", "x": 9, "y": 5, "w": 3, "h": 4 }
     ]
   },
-  "garbage": [
-    { "name": "Trash", "entity": "sensor.trash_schedule", "color": "#3d9b63" },
-    { "name": "Recycle", "entity": "sensor.recycle_schedule", "color": "#4a7dd6" },
-    { "name": "Compost", "entity": "sensor.compost_schedule", "color": "#8a5a3b" }
-  ],
-  "airQuality": {
-    "entity": "sensor.air_quality_index",
-    "name": "Air Quality",
-    "safeMax": 50
-  },
-  "hockey": {
-    "entity": "sensor.nhl_mtl"
-  },
-  "floorPlan": {
-    "house": { "w": [37, 6], "h": [24, 9] },
-    "floors": [
-      {
-        "id": "rdc",
-        "name": "Ground floor",
-        "rooms": [
-          { "id": "living", "type": "living", "w": [11, 6], "h": [14, 11], "x": 40, "y": 210 },
-          { "id": "kitchen", "type": "kitchen", "note": "dishwasherIsland", "w": [10, 10], "h": [8, 2], "x": 40, "y": 360 },
-          { "id": "bed1", "type": "bedroom", "tag": "1", "w": [9, 5], "h": [12, 1], "x": 155, "y": 210 },
-          { "id": "bath", "type": "bathroom", "w": [9, 4], "h": [4, 11], "x": 327, "y": 360 }
-        ]
-      },
-      {
-        "id": "ss1",
-        "name": "Basement",
-        "rooms": [
-          { "id": "family", "type": "familyRoom", "w": [10, 10], "h": [19, 9], "x": 40, "y": 210 },
-          { "id": "laundry", "type": "laundry", "note": "showerSink", "w": [14, 5], "h": [7, 3], "x": 252, "y": 320 }
-        ]
-      }
-    ],
-    "exterior": [
-      { "id": "pool", "shape": "circle", "type": "pool", "w": [15, 0], "h": [15, 0], "x": 40, "y": 30 },
-      { "id": "shed", "shape": "rect", "type": "shed", "w": [12, 4], "h": [14, 4], "x": 430, "y": 30 }
-    ]
+  "plugins": {
+    "frigate": { "enabled": false, "refreshSeconds": 8, "pollSeconds": 15, "alertLimit": 20 },
+    "expensave": { "enabled": false, "currency": "USD", "horizonDays": 14, "buffer": 500, "weeklyGoal": 200 },
+    "immich": { "enabled": false, "album": "Family" },
+    "hockey": { "enabled": false, "entity": "sensor.nhl_mtl" },
+    "garbage": {
+      "enabled": false,
+      "collections": [
+        { "name": "Recycling", "entity": "sensor.recycling_schedule", "color": "#4a7dd6" },
+        { "name": "Compost", "entity": "sensor.compost_schedule", "color": "#8a5a3b" },
+        { "name": "Trash", "entity": "sensor.trash_schedule", "color": "#3d9b63" }
+      ]
+    },
+    "airQuality": { "enabled": false, "entity": "sensor.air_quality_index", "name": "Air quality", "safeMax": 50 },
+    "floorPlan": { "enabled": false }
   }
 }

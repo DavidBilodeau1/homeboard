@@ -349,7 +349,6 @@ export const SpeakerIcon = ({ size = 22 }: { size?: number }) => (
   </I>
 )
 
-// ---------- Frigate / cameras ----------
 export const CheckIcon = ({ size = 18 }: { size?: number }) => (
   <I size={size}><polyline points="4.5 12.5 9.5 17.5 19.5 6.5" /></I>
 )

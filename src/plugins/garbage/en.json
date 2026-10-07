@@ -1,0 +1,8 @@
+{
+  "garbage.today": "today",
+  "garbage.tomorrow": "tomorrow",
+  "garbage.layer": "Garbage",
+  "garbage.settings.hint": "Each row is a collection type: pick its schedule sensor (a timestamp sensor with the next pickup date) and a color for the calendar & header alert.",
+  "garbage.plugin.title": "Garbage collection",
+  "garbage.plugin.description": "Pickup days on the calendar and in the header, from schedule sensors."
+}
