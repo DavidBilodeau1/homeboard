@@ -397,3 +397,14 @@ export const HockeyIcon = ({ size = 20 }: { size?: number }) => (
     <ellipse cx="12" cy="20" rx="2.6" ry="1.1" />
   </I>
 )
+
+export const SyringeIcon = ({ size = 20 }: { size?: number }) => (
+  <I size={size}>
+    <path d="M17 3l4 4" />
+    <path d="M19 5l-4 4" />
+    <path d="M16 8l-9.5 9.5a1.5 1.5 0 0 1-2.1 0l-0.9-0.9a1.5 1.5 0 0 1 0-2.1L13 5" />
+    <path d="M11.5 6.5l6 6" />
+    <path d="M9 12l1.5 1.5M7 14l1.5 1.5" />
+    <path d="M4 20l1.5-1.5" />
+  </I>
+)

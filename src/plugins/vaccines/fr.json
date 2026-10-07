@@ -1,0 +1,14 @@
+{
+  "vaccines.campaignOpen": "La vaccination grippe et COVID est commencée",
+  "vaccines.dismiss": "Masquer jusqu’à la prochaine saison",
+  "vaccines.checkFailing": "Suivi des vaccins en panne",
+  "vaccines.state.open": "Ouverte",
+  "vaccines.state.closed": "Pas encore ouverte",
+  "vaccines.state.missing": "Aucun indicateur pour cette saison",
+  "vaccines.state.error": "Vérification impossible",
+  "vaccines.settings.hint": "Toutes les deux heures, HomeBoard vérifie l’indicateur de campagne de Clic Santé pour la saison et l’encadré de prise de rendez-vous sur Québec.ca. L’alerte apparaît dans l’en-tête dès que l’un des deux s’ouvre, reste jusqu’à ce qu’on la ferme, puis revient la saison suivante. Si une vérification échoue pendant une journée, un avertissement gris apparaît plutôt.",
+  "vaccines.settings.checkedAt": "Dernière vérification à {time}.",
+  "vaccines.settings.showAgain": "Réafficher l’alerte cette saison",
+  "vaccines.plugin.title": "Campagne de vaccination",
+  "vaccines.plugin.description": "Une alerte dans l’en-tête quand la campagne annuelle de vaccination contre la grippe et la COVID commence au Québec."
+}
