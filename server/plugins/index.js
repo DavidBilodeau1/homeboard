@@ -5,12 +5,13 @@ import frigate from './frigate/index.js'
 import garbage from './garbage.js'
 import hockey from './hockey.js'
 import immich from './immich.js'
+import vaccines from './vaccines/index.js'
 
 /**
  * Each plugin may have: `validate(settings)`, the env-configured external `service` it talks to,
  * a `router(context)` served at /api/plugins/<id> while enabled, and a slideshow `photoSource(context)`.
  */
-export const PLUGINS = [frigate, expensave, immich, hockey, garbage, airQuality, floorPlan]
+export const PLUGINS = [frigate, expensave, immich, hockey, garbage, airQuality, vaccines, floorPlan]
 
 /** Whether the server can serve the plugin, and whether it does so with demo data. */
 export function pluginStatus(plugin, mock) {

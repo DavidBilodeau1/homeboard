@@ -1,0 +1,14 @@
+{
+  "vaccines.campaignOpen": "Flu & COVID vaccination has started",
+  "vaccines.dismiss": "Hide until next season",
+  "vaccines.checkFailing": "Vaccine check not working",
+  "vaccines.state.open": "Open",
+  "vaccines.state.closed": "Not open yet",
+  "vaccines.state.missing": "No flag for this season yet",
+  "vaccines.state.error": "Check failed",
+  "vaccines.settings.hint": "Every two hours, HomeBoard checks Clic Santé's campaign switch for this season and the booking box on Québec.ca. The header alert appears as soon as either one opens, stays until someone dismisses it, and comes back next season. If a check keeps failing for a day, a grey warning appears instead.",
+  "vaccines.settings.checkedAt": "Last checked at {time}.",
+  "vaccines.settings.showAgain": "Show the alert again this season",
+  "vaccines.plugin.title": "Vaccination campaign",
+  "vaccines.plugin.description": "A header alert when Québec's yearly flu and COVID vaccination campaign opens."
+}
