@@ -35,6 +35,7 @@ The core, using only built-in HA domains:
 | Hockey (NHL) | a live game tile | the [NHL API](https://github.com/JayBlackedOut/hass-nhlapi) HA integration |
 | Garbage collection | pickup days on the calendar and in the header | timestamp sensors with the next pickup date |
 | Air quality | an AQI tile and a header alert | an air quality index sensor |
+| Vaccination campaign | a header alert when Québec's flu/COVID campaign opens | nothing beyond HA |
 | Floor plan | a to-scale plan of your home with devices on it | nothing beyond HA |
 
 Turn plugins on in **Settings → Plugins**. A plugin whose server connection is
@@ -143,6 +144,15 @@ day before and the day of.
 
 **Air quality.** Pick an AQI sensor and the threshold above which the header
 shows an alert.
+
+**Vaccination campaign.** Québec only. Every two hours the server checks Clic
+Santé's switch for the season's campaign (`ENABLE_FLU_COVID_CAMPAIGN_<year>`)
+and the booking box on Québec.ca, which links to Clic Santé once booking opens.
+The header alert appears when either one opens and stays until someone
+dismisses it, which hides it on every screen until next season (seasons start
+in July). A check that keeps failing for a day shows a grey warning instead,
+so a broken check never looks like "not open yet". The Settings tab shows what
+each source last said and can bring the alert back.
 
 **Floor plan.** Rooms, floors and exterior features live under
 `plugins.floorPlan` (`house`, `floors`, `exterior`, dimensions in `[feet, inches]`).

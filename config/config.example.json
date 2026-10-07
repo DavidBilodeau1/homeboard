@@ -73,6 +73,7 @@
       ]
     },
     "airQuality": { "enabled": false, "entity": "sensor.air_quality_index", "name": "Air quality", "safeMax": 50 },
+    "vaccines": { "enabled": false },
     "floorPlan": { "enabled": false }
   }
 }
