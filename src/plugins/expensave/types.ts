@@ -23,8 +23,8 @@ export interface ExpensaveSettings extends PluginSettings {
   showInCalendar?: boolean
   /** how often a bank statement should be imported on the Money page (default 14 days) */
   importEveryDays?: number
-  /** everyday spending to reserve per week; omit to estimate it from the bank statements */
-  everydayPerWeek?: number
+  /** everyday spending to reserve per day; omit to reserve your usual pace from the bank statements */
+  dailyTarget?: number
 }
 
 /** One bank statement line, as the import preview shows it. */
@@ -194,13 +194,13 @@ export interface MoneyWeek {
   future: boolean
 }
 
-/** Everyday spending HomeBoard reserves; see everydaySpending() in money.ts. */
+/** Everyday spending per day: your usual pace (see everydaySpending() in money.ts) or your target. */
 export interface Everyday {
   perDay: number
   perWeek: number
-  /** statement weeks behind the estimate; 0 when it comes from the settings */
+  /** statement weeks behind the estimate; 0 for a target */
   weeks: number
-  source: 'statements' | 'settings'
+  source: 'statements' | 'target'
 }
 
 /** What can safely move to savings today; see savingsPlan() in money.ts. */
@@ -210,7 +210,13 @@ export interface SavingsPlan {
   statementDate: string | null
   /** days from `statementDate` to today */
   statementAge: number | null
+  /** everyday spending reserved: the target when one is set, else the usual pace */
   everyday: Everyday | null
+  /** usual pace from the statements, whatever the target */
+  usual: Everyday | null
+  /** with a target: lowest point at the usual pace once `setAside` has moved out */
+  usualLow: number | null
+  usualLowDate: string | null
   /** everyday spending since the statement: gone from the account, not in the ledger yet */
   spentSince: number
   /** everyday spending reserved over the horizon */

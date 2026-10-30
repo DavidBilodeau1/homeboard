@@ -89,8 +89,6 @@
   "money.record": "Record",
   "money.movedHint": "Added to Expensave as a transfer today, so this amount drops now. The next bank statement confirms it.",
   "money.savedLabel": "Savings",
-  "money.settings.everyday": "Everyday spending per week",
-  "money.settings.everydayHint": "Leave empty to estimate it from your bank statements (median of the last 6 weeks).",
   "bank.addsUp": "Adds up to the cent with your bank since the {date} balance.",
   "bank.short": "Since the {date} balance, Expensave would be {amount} below your bank: a deposit is probably missing from this file. Check it before applying — the balance you typed is applied either way.",
   "bank.over": "Since the {date} balance, Expensave would be {amount} above your bank: a charge is probably missing from this file, or something is counted twice.",
@@ -108,5 +106,16 @@
   "bank.resultMerged_one": "{count} duplicate removed.",
   "bank.resultMerged_other": "{count} duplicates removed.",
   "bank.verified": "Checked: every bank row is in Expensave.",
-  "bank.lastForecast": "Last statement: HomeBoard expected {forecast}, the bank had {balance} ({off})."
+  "bank.lastForecast": "Last statement: HomeBoard expected {forecast}, the bank had {balance} ({off}).",
+  "money.setAsideTargetHint": "The most you can move now if you keep to {perDay} for the next {days} days.",
+  "money.everydayTarget": "Everyday spending at your target, {perDay}/day",
+  "money.perDay": "{amount}/day",
+  "money.target": "Daily spending target",
+  "money.setTarget": "Set a daily spending target",
+  "money.clearTarget": "Use my usual pace",
+  "money.usualPace": "Your usual pace: {perDay}",
+  "money.recentPace": "last {days} days: {perDay}",
+  "money.usualWarning": "Move it and keep your usual {perDay}, and the account dips to {low} on {date}.",
+  "money.settings.target": "Daily spending target",
+  "money.settings.targetHint": "Leave empty to reserve your usual pace from the bank statements. With a target, the amount to set aside assumes you keep to it."
 }

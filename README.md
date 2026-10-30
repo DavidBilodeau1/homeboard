@@ -126,9 +126,12 @@ charges not cleared yet, walked day by day through everything scheduled until
 the horizon. The answer is the **lowest** point along the way minus your buffer,
 since a paycheque that lands after rent cannot pay it. Everyday spending (bank
 rows no plan entry announced, transfers between your own accounts excluded) is
-reserved for every day too, including the days since the last statement: the
-median week of the last six, or `everydayPerWeek` from Settings. "I moved it to
-savings" records a transfer at once, so the amount drops before the bank shows it.
+reserved for every day too, including the days since the last statement: your
+usual pace (the median week of the last six), or a daily spending target set on
+the card or in Settings. A target lowers the reserve, so you can set more aside
+now; the card then shows your usual and recent pace and warns where the usual
+pace would take the account. "I moved it to savings" records a transfer at once,
+so the amount drops before the bank shows it.
 
 The *Bank statement* card takes a CSV export (date, description, and amount or
 withdrawal/deposit columns), shows what it would change, and on confirmation

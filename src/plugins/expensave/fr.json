@@ -89,8 +89,6 @@
   "money.record": "Enregistrer",
   "money.movedHint": "Ajouté à Expensave comme virement aujourd’hui : le montant baisse tout de suite. Le prochain relevé le confirmera.",
   "money.savedLabel": "Épargne",
-  "money.settings.everyday": "Dépenses courantes par semaine",
-  "money.settings.everydayHint": "Laisse vide pour l’estimer à partir des relevés (médiane des 6 dernières semaines).",
   "bank.addsUp": "Concorde au sou près avec la banque depuis le solde du {date}.",
   "bank.short": "Depuis le solde du {date}, Expensave serait {amount} sous ta banque : un dépôt manque probablement dans ce fichier. Vérifie avant d’appliquer — le solde saisi s’applique de toute façon.",
   "bank.over": "Depuis le solde du {date}, Expensave serait {amount} au-dessus de ta banque : un débit manque probablement dans ce fichier, ou quelque chose est compté en double.",
@@ -108,5 +106,16 @@
   "bank.resultMerged_one": "{count} doublon retiré.",
   "bank.resultMerged_other": "{count} doublons retirés.",
   "bank.verified": "Vérifié : chaque ligne du relevé est dans Expensave.",
-  "bank.lastForecast": "Dernier relevé : HomeBoard prévoyait {forecast}, la banque affichait {balance} ({off})."
+  "bank.lastForecast": "Dernier relevé : HomeBoard prévoyait {forecast}, la banque affichait {balance} ({off}).",
+  "money.setAsideTargetHint": "Le maximum qu’on peut déplacer maintenant en s’en tenant à {perDay} pendant {days} jours.",
+  "money.everydayTarget": "Dépenses courantes à ta cible, {perDay}/jour",
+  "money.perDay": "{amount}/jour",
+  "money.target": "Cible de dépenses par jour",
+  "money.setTarget": "Fixer une cible de dépenses par jour",
+  "money.clearTarget": "Revenir à mon rythme habituel",
+  "money.usualPace": "Ton rythme habituel : {perDay}",
+  "money.recentPace": "{days} derniers jours : {perDay}",
+  "money.usualWarning": "Si tu le déplaces et gardes ton rythme habituel de {perDay}, le compte descend à {low} le {date}.",
+  "money.settings.target": "Cible de dépenses par jour",
+  "money.settings.targetHint": "Laisse vide pour réserver ton rythme habituel d’après les relevés. Avec une cible, le montant à mettre de côté suppose que tu la respectes."
 }

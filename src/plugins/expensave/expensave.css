@@ -45,6 +45,18 @@
 .mny-asof { font-size: 0.75rem; color: var(--muted); font-weight: 600; margin: -8px 0 12px; }
 .mny-asof.late { color: var(--out); }
 .mny-moved { margin-top: 12px; align-self: flex-start; }
+.mny-target { margin: 0 0 14px; font-size: 0.8125rem; }
+.mny-target-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mny-target-row > span { color: var(--muted); font-weight: 600; margin-right: auto; }
+.mny-target-row b { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 5.5em; text-align: center; }
+.mny-step { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 1.1rem; font-weight: 800; line-height: 1; }
+.mny-step:disabled { opacity: 0.4; }
+.mny-target-clear { font-size: 0.75rem; font-weight: 700; color: var(--muted); text-decoration: underline; }
+.mny-target p { margin: 4px 0 0; font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.mny-target p .in { color: var(--in); }
+.mny-target p .out { color: var(--out); }
+.mny-target-set { align-self: flex-start; margin-bottom: 14px; }
+.mny-usual-warn { margin: 10px 0 0; }
 .mny-moved-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .mny-moved-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .mny-hero-sub { font-size: 0.8125rem; color: var(--muted); margin: 4px 0 14px; }

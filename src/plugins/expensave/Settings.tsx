@@ -61,9 +61,9 @@ export function ExpensaveSettingsPanel({ settings, onChange }: SettingsPanelProp
         onChange={(buffer) => set({ buffer })} />
       <NumberField label={t('money.settings.goal')} min={0} step={25} value={settings.weeklyGoal}
         onChange={(weeklyGoal) => set({ weeklyGoal })} />
-      <NumberField label={t('money.settings.everyday')} min={0} step={50} value={settings.everydayPerWeek}
-        onChange={(everydayPerWeek) => set({ everydayPerWeek })} />
-      <Note>{t('money.settings.everydayHint')}</Note>
+      <NumberField label={t('money.settings.target')} min={0} step={10} value={settings.dailyTarget}
+        onChange={(dailyTarget) => set({ dailyTarget })} />
+      <Note>{t('money.settings.targetHint')}</Note>
       <NumberField label={t('money.settings.importEvery')} min={1} max={90} value={settings.importEveryDays} fallback={DEFAULT_IMPORT_EVERY_DAYS}
         onChange={(importEveryDays) => set({ importEveryDays })} />
       <Field label={t('money.settings.show')}>

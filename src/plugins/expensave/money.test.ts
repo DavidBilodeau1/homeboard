@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { everydaySpending, groupByDay, moneyRange, parseAmount, savingsPlan, startOfWeek, statementForecast, weeklyMoney } from './money'
+import {
+  everydaySpending, groupByDay, moneyRange, parseAmount, recentSpending, savingsPlan, startOfWeek, statementForecast, weeklyMoney,
+} from './money'
 import type { MoneyDay, Transaction, TransactionKind } from './types'
 
 const TODAY = new Date(2026, 8, 10) // Thursday 2026-09-10
@@ -183,15 +185,45 @@ describe('everydaySpending', () => {
     expect(everydaySpending([txn('2026-09-09', -80)])).toBe(null)
   })
 
-  it('lets the settings replace the estimate', () => {
-    expect(everydaySpending(rows, { everydayPerWeek: 700 })).toMatchObject({ perDay: 100, source: 'settings' })
+  it('tells how the last days went, once the statements cover them', () => {
+    expect(recentSpending(rows, 7)).toBe(50)
+    expect(recentSpending(rows, 60)).toBe(null)
+  })
+})
+
+describe('savingsPlan with a daily target', () => {
+  // usual pace $50/day from the statements above; the target is $20/day
+  const rows = [
+    bank('2026-08-21', -100), bank('2026-08-25', -200), bank('2026-08-30', -200), bank('2026-09-01', -500),
+    bank('2026-09-05', -350), bank('2026-09-10', -1, 'matched'), txn('2026-09-12', -500),
+  ]
+  const plan = savingsPlan(rows, daysUpTo('2026-09-10', 3000), TODAY, { horizonDays: 7, buffer: 1000, dailyTarget: 20 })
+
+  it('reserves the target, so spending less frees money now', () => {
+    expect(plan.everyday).toMatchObject({ perDay: 20, source: 'target' })
+    expect(plan.usual?.perDay).toBe(50)
+    expect(plan.low).toBe(2360)
+    expect(plan.setAside).toBe(1360)
+  })
+
+  it('shows where the usual pace would leave the account once that money has moved', () => {
+    // 3000 − 7 × 50 − 500 = 2150 at the usual pace, minus the 1360 moved out
+    expect(plan.usualLow).toBe(790)
+    expect(plan.usualLowDate).toBe('2026-09-17')
+  })
+
+  it('has nothing to compare without a target', () => {
+    const usual = savingsPlan(rows, daysUpTo('2026-09-10', 3000), TODAY, { horizonDays: 7, buffer: 1000 })
+    expect(usual.everyday?.source).toBe('statements')
+    expect(usual.usualLow).toBe(null)
+    expect(usual.setAside).toBe(1150)
   })
 })
 
 describe('savingsPlan with everyday spending', () => {
   // statement through Sep 7, three days before TODAY; $10 a day of everyday spending
   const rows = [bank('2026-09-07', -20), txn('2026-09-12', -500), txn('2026-09-14', 1000)]
-  const plan = savingsPlan(rows, daysUpTo('2026-09-10', 1000), TODAY, { horizonDays: 7, buffer: 0, everydayPerWeek: 70 })
+  const plan = savingsPlan(rows, daysUpTo('2026-09-10', 1000), TODAY, { horizonDays: 7, buffer: 0, dailyTarget: 10 })
 
   it('takes out what was likely spent since the statement', () => {
     expect(plan.statementDate).toBe('2026-09-07')

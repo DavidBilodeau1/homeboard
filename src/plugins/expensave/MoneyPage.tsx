@@ -6,7 +6,7 @@ import { dayKey } from '../../util'
 import { usePluginSettings } from '../settings'
 import { recordSetAside } from './api'
 import { BankImport } from './BankImport'
-import { calendarColor, calendarName, DEFAULT_IMPORT_EVERY_DAYS, fmtMoney, fmtWeekRange, parseAmount } from './money'
+import { calendarColor, calendarName, DEFAULT_IMPORT_EVERY_DAYS, fmtMoney, fmtWeekRange, parseAmount, recentSpending } from './money'
 import { useMoney } from './MoneyProvider'
 import type { ExpensaveSettings, MoneyState, MoneyWeek, SavingsPlan, Transaction } from './types'
 
@@ -87,7 +87,9 @@ function Breakdown({ plan, currency }: { plan: SavingsPlan; currency: string }) 
       {plan.upcomingOut !== 0 && <div><span>{t('money.billsSoon')}</span><b className="out">{money(plan.upcomingOut)}</b></div>}
       {plan.everyday && plan.everydayAhead !== 0 && (
         <div>
-          <span>{t('money.everyday', { perDay: fmtMoney(plan.everyday.perDay, locale, currency, false) })}</span>
+          <span>{t(plan.everyday.source === 'target' ? 'money.everydayTarget' : 'money.everyday', {
+            perDay: fmtMoney(plan.everyday.perDay, locale, currency, false),
+          })}</span>
           <b className="out">−{money(plan.everydayAhead)}</b>
         </div>
       )}
@@ -181,11 +183,72 @@ function MovedIt({ suggested, calendar }: { suggested: number; calendar: number 
   )
 }
 
+const TARGET_STEP = 10
+
+/** Daily spending target: lower it to set more aside now; the amount then assumes you keep to it. */
+function DailyTarget({ money, settings, recentDays }: { money: MoneyState; settings: ExpensaveSettings; recentDays: number }) {
+  const { locale, savePluginSettings, t } = useStore()
+  const { plan, currency } = money
+  const perDay = (v: number) => t('money.perDay', { amount: fmtMoney(v, locale, currency, false) })
+  const target = settings.dailyTarget
+  const usual = plan.usual?.perDay
+  const recent = useMemo(() => recentSpending(money.transactions, recentDays), [money.transactions, recentDays])
+  const save = (dailyTarget: number | undefined) => {
+    const next: ExpensaveSettings = { ...settings, dailyTarget }
+    return savePluginSettings('expensave', next)
+  }
+
+  if (target == null) {
+    if (!money.canWrite || usual == null) return null
+    return (
+      <button className="dash-cancel mny-target-set" onClick={() => save(Math.floor(usual / TARGET_STEP) * TARGET_STEP)}>
+        {t('money.setTarget')}
+      </button>
+    )
+  }
+  return (
+    <div className="mny-target">
+      <div className="mny-target-row">
+        <span>{t('money.target')}</span>
+        {money.canWrite && (
+          <button className="mny-step" aria-label="−" disabled={target <= 0} onClick={() => save(Math.max(0, target - TARGET_STEP))}>−</button>
+        )}
+        <b>{perDay(target)}</b>
+        {money.canWrite && <button className="mny-step" aria-label="+" onClick={() => save(target + TARGET_STEP)}>+</button>}
+        {money.canWrite && <button className="mny-target-clear" onClick={() => save(undefined)}>{t('money.clearTarget')}</button>}
+      </div>
+      <p>
+        {usual != null && t('money.usualPace', { perDay: perDay(usual) })}
+        {recent != null && (
+          <> · <span className={recent > target ? 'out' : 'in'}>{t('money.recentPace', { days: recentDays, perDay: perDay(recent) })}</span></>
+        )}
+      </p>
+    </div>
+  )
+}
+
+/** With a target, what happens if the money moves but spending stays as usual. */
+function UsualPaceWarning({ plan, currency }: { plan: SavingsPlan; currency: string }) {
+  const { locale, t } = useStore()
+  if (plan.usualLow == null || !plan.usual || !plan.usualLowDate || plan.usualLow >= plan.buffer) return null
+  return (
+    <p className="bank-warn mny-usual-warn">
+      {t('money.usualWarning', {
+        perDay: t('money.perDay', { amount: fmtMoney(plan.usual.perDay, locale, currency, false) }),
+        low: fmtMoney(plan.usualLow, locale, currency, false),
+        date: dateLabel(plan.usualLowDate, locale),
+      })}
+    </p>
+  )
+}
+
 function SetAsideCard({ money, settings }: { money: MoneyState; settings: ExpensaveSettings }) {
   const { locale, t } = useStore()
   const { plan, currency } = money
   const typical = useMemo(() => typicalWeek(money.weeks), [money.weeks])
-  const late = plan.statementAge != null && plan.statementAge > (settings.importEveryDays ?? DEFAULT_IMPORT_EVERY_DAYS)
+  const every = settings.importEveryDays ?? DEFAULT_IMPORT_EVERY_DAYS
+  const late = plan.statementAge != null && plan.statementAge > every
+  const targeted = plan.everyday?.source === 'target'
   const calendar = settings.calendars?.[0]?.id ?? money.calendars[0]?.id
   const weeklyGoal = settings.weeklyGoal
   return (
@@ -195,10 +258,15 @@ function SetAsideCard({ money, settings }: { money: MoneyState; settings: Expens
         {fmtMoney(plan.shortfall ? -plan.shortfall : plan.setAside, locale, currency)}
       </div>
       <p className="mny-hero-sub">
-        {t(plan.shortfall ? 'money.shortfallHint' : 'money.setAsideHint', { days: plan.horizonDays })}
+        {t(plan.shortfall ? 'money.shortfallHint' : targeted ? 'money.setAsideTargetHint' : 'money.setAsideHint', {
+          days: plan.horizonDays,
+          perDay: t('money.perDay', { amount: fmtMoney(plan.everyday?.perDay ?? 0, locale, currency, false) }),
+        })}
       </p>
       <StatementAge plan={plan} late={late} />
+      <DailyTarget money={money} settings={settings} recentDays={every} />
       <Breakdown plan={plan} currency={currency} />
+      <UsualPaceWarning plan={plan} currency={currency} />
       {money.canWrite && calendar != null && plan.setAside > 0 && <MovedIt suggested={plan.setAside} calendar={calendar} />}
       {!!weeklyGoal && weeklyGoal > 0 && <WeeklyGoal goal={weeklyGoal} setAside={plan.setAside} currency={currency} />}
       {typical != null && (
