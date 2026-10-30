@@ -18,6 +18,7 @@ export default {
     [isOptionalPositive(settings.importEveryDays), 'importEveryDays must be a positive number'],
     [isOptionalNumber(settings.buffer), 'buffer must be a number'],
     [isOptionalNumber(settings.weeklyGoal), 'weeklyGoal must be a number'],
+    [isOptionalNumber(settings.everydayPerWeek), 'everydayPerWeek must be a number'],
     [isOptionalString(settings.currency), 'currency must be a string'],
   ]),
   router: ({ mock, dataDir, canWrite }) => expensaveRouter(mock ? expensaveMockApi() : expensaveApi, {

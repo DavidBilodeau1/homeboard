@@ -1,11 +1,12 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { MoneyIcon } from '../../icons'
 import type { Translate } from '../../i18n'
 import { useStore } from '../../store'
 import { dayKey } from '../../util'
 import { usePluginSettings } from '../settings'
+import { recordSetAside } from './api'
 import { BankImport } from './BankImport'
-import { calendarColor, calendarName, fmtMoney, fmtWeekRange } from './money'
+import { calendarColor, calendarName, DEFAULT_IMPORT_EVERY_DAYS, fmtMoney, fmtWeekRange, parseAmount } from './money'
 import { useMoney } from './MoneyProvider'
 import type { ExpensaveSettings, MoneyState, MoneyWeek, SavingsPlan, Transaction } from './types'
 
@@ -73,11 +74,23 @@ function Breakdown({ plan, currency }: { plan: SavingsPlan; currency: string }) 
   return (
     <div className="mny-breakdown">
       <div><span>{t('money.balanceNow')}</span><b>{money(plan.balance)}</b></div>
+      {plan.spentSince !== 0 && plan.statementDate && (
+        <div>
+          <span>{t('money.spentSince', { date: dateLabel(plan.statementDate, locale) })}</span>
+          <b className="out">−{money(plan.spentSince)}</b>
+        </div>
+      )}
       {plan.uncleared !== 0 && (
         <div><span>{t('money.uncleared', { count: plan.unclearedCount })}</span><b className="out">{money(plan.uncleared)}</b></div>
       )}
       {plan.upcomingIn !== 0 && <div><span>{t('money.incomingSoon')}</span><b className="in">+{money(plan.upcomingIn)}</b></div>}
       {plan.upcomingOut !== 0 && <div><span>{t('money.billsSoon')}</span><b className="out">{money(plan.upcomingOut)}</b></div>}
+      {plan.everyday && plan.everydayAhead !== 0 && (
+        <div>
+          <span>{t('money.everyday', { perDay: fmtMoney(plan.everyday.perDay, locale, currency, false) })}</span>
+          <b className="out">−{money(plan.everydayAhead)}</b>
+        </div>
+      )}
       {plan.lowDate !== dayKey(new Date()) && (
         <div className="mny-low">
           <span>{t('money.lowestPoint', { date: dateLabel(plan.lowDate, locale) })}</span>
@@ -108,20 +121,85 @@ function WeeklyGoal({ goal, setAside, currency }: { goal: number; setAside: numb
   )
 }
 
-function SetAsideCard({ money, weeklyGoal }: { money: MoneyState; weeklyGoal?: number }) {
+/** How old the bank data behind the number is; past the import rhythm it shouldn't be trusted. */
+function StatementAge({ plan, late }: { plan: SavingsPlan; late: boolean }) {
+  const { locale, t } = useStore()
+  if (!plan.statementDate || plan.statementAge == null) return <p className="mny-asof late">{t('money.noStatement')}</p>
+  const date = dateLabel(plan.statementDate, locale)
+  const text = late
+    ? t('money.statementLate', { date, count: plan.statementAge })
+    : plan.statementAge === 0 ? t('money.statementToday', { date }) : t('money.statementAge', { date, count: plan.statementAge })
+  return (
+    <p className={`mny-asof${late ? ' late' : ''}`}>
+      {text}
+      {!plan.everyday && <> {t('money.everydayUnknown')}</>}
+    </p>
+  )
+}
+
+/** Records a transfer to savings right away, so the amount drops before the next statement shows it. */
+function MovedIt({ suggested, calendar }: { suggested: number; calendar: number }) {
+  const { t } = useStore()
+  const { reload } = useMoney()
+  const [text, setText] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const amount = text == null ? null : parseAmount(text)
+
+  if (text == null) {
+    return <button className="dash-cancel mny-moved" onClick={() => setText(String(Math.floor(suggested)))}>{t('money.movedIt')}</button>
+  }
+
+  const save = async () => {
+    if (!amount || amount <= 0) return
+    setBusy(true)
+    setError(null)
+    try {
+      await recordSetAside({ calendar, amount, label: t('money.savedLabel'), date: dayKey(new Date()) })
+      setText(null)
+      reload()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mny-moved-form">
+      <label className="bank-field">
+        <span>{t('money.movedAmount')}</span>
+        <input inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} disabled={busy} autoFocus />
+      </label>
+      <div className="mny-moved-actions">
+        <button className="dash-cancel" onClick={() => setText(null)} disabled={busy}>{t('bank.cancel')}</button>
+        <button className="dash-save" onClick={save} disabled={busy || !amount || amount <= 0}>{t('money.record')}</button>
+      </div>
+      <p className="settings-note">{t('money.movedHint')}</p>
+      {error && <p className="settings-note mny-err">{error}</p>}
+    </div>
+  )
+}
+
+function SetAsideCard({ money, settings }: { money: MoneyState; settings: ExpensaveSettings }) {
   const { locale, t } = useStore()
   const { plan, currency } = money
   const typical = useMemo(() => typicalWeek(money.weeks), [money.weeks])
+  const late = plan.statementAge != null && plan.statementAge > (settings.importEveryDays ?? DEFAULT_IMPORT_EVERY_DAYS)
+  const calendar = settings.calendars?.[0]?.id ?? money.calendars[0]?.id
+  const weeklyGoal = settings.weeklyGoal
   return (
     <section className="card mny-hero">
       <h2 className="card-title"><MoneyIcon size={20} /> {t('money.setAside')}</h2>
-      <div className={`mny-hero-value${plan.shortfall ? ' short' : ''}`}>
+      <div className={`mny-hero-value${plan.shortfall ? ' short' : ''}${late ? ' stale' : ''}`}>
         {fmtMoney(plan.shortfall ? -plan.shortfall : plan.setAside, locale, currency)}
       </div>
       <p className="mny-hero-sub">
         {t(plan.shortfall ? 'money.shortfallHint' : 'money.setAsideHint', { days: plan.horizonDays })}
       </p>
+      <StatementAge plan={plan} late={late} />
       <Breakdown plan={plan} currency={currency} />
+      {money.canWrite && calendar != null && plan.setAside > 0 && <MovedIt suggested={plan.setAside} calendar={calendar} />}
       {!!weeklyGoal && weeklyGoal > 0 && <WeeklyGoal goal={weeklyGoal} setAside={plan.setAside} currency={currency} />}
       {typical != null && (
         <p className="mny-typical">
@@ -212,7 +290,7 @@ export function MoneyPage() {
 
   return (
     <div className="mny-page">
-      <SetAsideCard money={money} weeklyGoal={settings.weeklyGoal} />
+      <SetAsideCard money={money} settings={settings} />
       <WeeksCard weeks={money.weeks} currency={money.currency} />
       <BankImport />
       <UpcomingCard money={money} />

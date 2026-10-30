@@ -23,6 +23,8 @@ export interface ExpensaveSettings extends PluginSettings {
   showInCalendar?: boolean
   /** how often a bank statement should be imported on the Money page (default 14 days) */
   importEveryDays?: number
+  /** everyday spending to reserve per week; omit to estimate it from the bank statements */
+  everydayPerWeek?: number
 }
 
 /** One bank statement line, as the import preview shows it. */
@@ -64,6 +66,23 @@ export interface BankImportStatus {
   pending: number
   balance: number | null
   errors: number
+  /** rows imported while pending that got their posted description */
+  refreshed?: number
+  /** rows earlier uploads wrote twice, removed */
+  merged?: number
+  /** statement rows missing from Expensave after the import (null when it could not be checked) */
+  lost?: number | null
+  /** what the Money page expected the balance to be on `to`, before this statement */
+  forecast?: number | null
+}
+
+/** A charge that repeats on a rhythm but has no plan entry. */
+export interface RecurringCharge {
+  label: string
+  amount: number
+  every: 'week' | 'twoWeeks' | 'month'
+  last: string
+  count: number
 }
 
 /** Dry run of a statement upload. */
@@ -76,6 +95,10 @@ export interface BankPreview {
   calendar: { id: number; name: string }
   matched: { entry: BankPlanned; rows: BankRow[] }[]
   added: BankRow[]
+  /** rows imported while still pending, now with their posted description */
+  refreshed: { entry: BankPlanned; row: BankRow }[]
+  /** copies earlier uploads wrote twice; they get removed */
+  twins: BankPlanned[]
   duplicates: number
   missing: (BankPlanned & { action: 'remove' | 'pending' })[]
   /** balance column of the export, when it has one */
@@ -84,6 +107,12 @@ export interface BankPreview {
   expensaveBalance: number
   /** …and once the import is applied, before any balance correction */
   balanceAfter: number
+  /** the bank balance `balanceAfter` counts from, when an earlier statement set one */
+  balanceFrom: { date: string; balance: number } | null
+  /** what the plan alone expected between `balanceFrom` and the statement's end; null when not knowable */
+  plannedSince: number | null
+  /** unplanned charges that look recurring */
+  recurring: RecurringCharge[]
   /** days between the previous statement and this one that no upload covered */
   gapDays: number
   lastImport: BankImportStatus | null
@@ -107,6 +136,12 @@ export interface TransactionCategory {
   color: string | null
 }
 
+/**
+ * Where a transaction comes from: typed in Expensave (`plan`), a bank row that confirmed a plan entry (`matched`),
+ * a bank row nothing planned (`bank`), a move between the household's own accounts (`transfer`), or a balance update.
+ */
+export type TransactionKind = 'plan' | 'matched' | 'bank' | 'transfer' | 'balance'
+
 /** One transaction. Expensave's sign convention: income > 0, spending < 0. */
 export interface Transaction {
   id: number
@@ -123,6 +158,7 @@ export interface Transaction {
   at: string | null
   recurring: boolean
   frequency: string | null
+  kind: TransactionKind
 }
 
 /** One day of the household ledger; `balance` counts confirmed money only. */
@@ -141,6 +177,8 @@ export interface MoneyPayload {
   transactions: Transaction[]
   days: MoneyDay[]
   errors: string[]
+  /** false on read-only panels */
+  canWrite: boolean
 }
 
 export interface MoneyWeek {
@@ -156,9 +194,27 @@ export interface MoneyWeek {
   future: boolean
 }
 
+/** Everyday spending HomeBoard reserves; see everydaySpending() in money.ts. */
+export interface Everyday {
+  perDay: number
+  perWeek: number
+  /** statement weeks behind the estimate; 0 when it comes from the settings */
+  weeks: number
+  source: 'statements' | 'settings'
+}
+
 /** What can safely move to savings today; see savingsPlan() in money.ts. */
 export interface SavingsPlan {
   balance: number
+  /** last day the bank statements cover; null before the first import */
+  statementDate: string | null
+  /** days from `statementDate` to today */
+  statementAge: number | null
+  everyday: Everyday | null
+  /** everyday spending since the statement: gone from the account, not in the ledger yet */
+  spentSince: number
+  /** everyday spending reserved over the horizon */
+  everydayAhead: number
   uncleared: number
   upcomingIn: number
   upcomingOut: number
@@ -185,6 +241,7 @@ export interface MoneyState {
   byDay: Map<string, DayMoney>
   currency: string
   errors: string[]
+  canWrite: boolean
 }
 
 export interface DayMoney {

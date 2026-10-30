@@ -3,13 +3,31 @@ import { useStore } from '../../store'
 import { usePluginSettings } from '../settings'
 import { getImportStatus, ImportError, previewBankImport, readStatementFile, type ImportResult } from './api'
 import { BankReview, shortDate } from './BankReview'
-import { DEFAULT_IMPORT_EVERY_DAYS, nextImportDue } from './money'
+import { DEFAULT_IMPORT_EVERY_DAYS, fmtMoney, nextImportDue } from './money'
 import { useMoney } from './MoneyProvider'
 import type { BankImportStatus, BankPreview, ExpensaveSettings } from './types'
 
 const DUE_SOON_DAYS = 2
 
 type ImportStatus = { lastImport: BankImportStatus | null; canWrite: boolean }
+
+/** How far the Money page's guess for the last statement's end was from the bank. */
+function LastForecast({ last }: { last: BankImportStatus }) {
+  const { locale, t } = useStore()
+  const { money } = useMoney()
+  if (last.forecast == null || last.balance == null) return null
+  const currency = money?.currency ?? 'CAD'
+  const off = Math.round((last.balance - last.forecast) * 100) / 100
+  return (
+    <p className="mny-bank-status">
+      {t('bank.lastForecast', {
+        forecast: fmtMoney(last.forecast, locale, currency, false),
+        balance: fmtMoney(last.balance, locale, currency, false),
+        off: `${off > 0 ? '+' : ''}${fmtMoney(off, locale, currency, false)}`,
+      })}
+    </p>
+  )
+}
 
 function DueReminder({ last, every }: { last: BankImportStatus | null; every: number }) {
   const { locale, now, t } = useStore()
@@ -80,6 +98,7 @@ export function BankImport() {
         {last ? t('bank.syncedThrough', { date: shortDate(last.to, locale) }) : t('bank.never', { days: every })}
         {last?.balance != null && <> · {t('bank.balanceSet')}</>}
       </p>
+      {last && <LastForecast last={last} />}
       <DueReminder last={last} every={every} />
 
       <div className="mny-bank-actions">
@@ -93,6 +112,8 @@ export function BankImport() {
       {result && (
         <p className="settings-note">
           {t('bank.result', { matched: result.matched, added: result.added, removed: result.removed })}
+          {!!result.merged && <> {t('bank.resultMerged', { count: result.merged })}</>}
+          {result.lost === 0 && !result.errors.length && <> {t('bank.verified')}</>}
           {result.errors.map((e) => <span className="mny-err" key={e}><br />{e}</span>)}
         </p>
       )}

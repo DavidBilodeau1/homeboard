@@ -40,6 +40,7 @@ export function MoneyProvider({ active, children }: { active: boolean; children:
         byDay: groupByDay(payload.transactions),
         currency: currencyOf(settings),
         errors: payload.errors,
+        canWrite: payload.canWrite !== false,
       })
       setError(null)
     } catch (e) {

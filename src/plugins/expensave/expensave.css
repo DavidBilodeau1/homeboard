@@ -41,6 +41,12 @@
 
 .mny-hero-value { font-size: 2.75rem; font-weight: 800; line-height: 1.1; color: var(--in); }
 .mny-hero-value.short { color: var(--out); }
+.mny-hero-value.stale { opacity: 0.45; }
+.mny-asof { font-size: 0.75rem; color: var(--muted); font-weight: 600; margin: -8px 0 12px; }
+.mny-asof.late { color: var(--out); }
+.mny-moved { margin-top: 12px; align-self: flex-start; }
+.mny-moved-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.mny-moved-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .mny-hero-sub { font-size: 0.8125rem; color: var(--muted); margin: 4px 0 14px; }
 
 .mny-breakdown { display: flex; flex-direction: column; gap: 6px; margin-bottom: auto; }
@@ -120,6 +126,7 @@
 .bank-balance-math b.in { color: var(--in); }
 .bank-balance-math b.out { color: var(--out); }
 .bank-warn { font-size: 0.8125rem; font-weight: 700; color: var(--out); }
+.bank-ok { font-size: 0.8125rem; font-weight: 700; color: var(--in); }
 .bank-section h4, .bank-section summary { font-size: 0.875rem; font-weight: 800; margin-bottom: 4px; }
 .bank-section summary { cursor: pointer; }
 .bank-section .settings-note { margin-bottom: 6px; }
