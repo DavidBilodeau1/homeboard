@@ -131,7 +131,8 @@ export function parseBankCsv(text) {
 
 /** Keyword guesses by Expensave category name, used when Expensave has no suggestion for a label. */
 export const CATEGORY_RULES = [
-  [/PAIE|PAYROLL|ALLOCATION|SALAIRE/i, ['Income', 'Revenu', 'Salary']],
+  // whole word: "PAIEMENT DIVERS" is a charge, not a paycheque
+  [/\bPAIE\b|PAYROLL|ALLOCATION|SALAIRE/i, ['Income', 'Revenu', 'Salary']],
   [/MAXI|IGA|METRO|COSTCO|SUPER C|PROVIGO|WALMART|MARCHE|MARCHÉ|BOUCHERIE|FRUITERIE/i, ['Groceries', 'Épicerie']],
   [/TIM HORTONS|STARBUCKS|MCDONALD|RESTAURANT|PIZZ|SUSHI|CAFE|CAFÉ|PATISSERIE|PÂTISSERIE|BOULANG|SUBWAY|A&W|UBER EATS|DOORDASH/i, ['Eating out', 'Restaurants']],
   [/PHARMA|PHARMACIE|DENTAI|CLINIQUE|NEWLOOK|OPTOM|MANULIFE|SANTÉ/i, ['Health', 'Santé']],
@@ -145,18 +146,22 @@ export const CATEGORY_RULES = [
 
 /** Category id for a bank row from the keyword rules, or null. */
 export function guessCategory(row, categories) {
+  const rule = CATEGORY_RULES.find(([re, names]) => re.test(row.raw) && categoryNamed(categories, names))
+  return rule ? categoryNamed(categories, rule[1]) : null
+}
+
+/** Id of the first existing category with one of `names` (any case), or null. */
+export function categoryNamed(categories, names) {
   const byName = new Map(categories.filter((c) => c.type !== 'balance_update').map((c) => [c.name.toLowerCase(), c.id]))
-  for (const [re, names] of CATEGORY_RULES) {
-    if (!re.test(row.raw)) continue
-    for (const n of names) if (byName.has(n.toLowerCase())) return byName.get(n.toLowerCase())
-  }
-  return null
+  return names.map((n) => byName.get(n.toLowerCase())).find((id) => id != null) ?? null
 }
 
 /** Tag HomeBoard leaves in an Expensave description to recognise its own rows. */
 export const TAG_RE = /\[hb:([0-9a-f]{10}|balance)\]/
 export const tagOf = (e) => (e.description ?? '').match(TAG_RE)?.[1] ?? null
 export const withTag = (text, tag) => `${text ? `${text} ` : ''}[hb:${tag}]`
+/** The bank's description of an imported row, without the tag. */
+export const rawOf = (e) => (e.description ?? '').replace(TAG_RE, '').trim()
 
 /** How far a bank date may sit from the planned one and still be the same bill. */
 export const MATCH_DAYS = 4
@@ -167,10 +172,38 @@ export const GRACE_DAYS = 2
 
 const dayNum = (d) => Math.round(Date.parse(`${d}T00:00:00Z`) / 86_400_000)
 const round2 = (v) => Math.round(v * 100) / 100
+const sameCents = (a, b) => Math.round(a * 100) === Math.round(b * 100)
 // a few cents or half a percent apart is the same bill; 280 vs 281.67 is not
 const close = (a, b) => Math.sign(a) === Math.sign(b) && Math.abs(a - b) <= Math.max(0.05, Math.abs(a) * 0.005)
 const isBalanceUpdate = (e) => e.category?.type === 'balance_update'
-const dayOf = (e) => String(e.createdAt ?? '').slice(0, 10)
+const isImported = (e) => !!tagOf(e) && tagOf(e) !== 'balance'
+export const dayOf = (e) => String(e.createdAt ?? '').slice(0, 10)
+
+/** Money moved between the household's own accounts: saving, not spending. */
+const OWN_TRANSFER_RE = /TROUV[ÉE]PARGNE|T[ÉE]L[ÉE]VIREMENT AU COMPTE|VIREMENT PAR BANQUE EN DIRECT|VIREMENT ENTRE (?:COMPTES|FOLIOS)|TRANSFER (?:TO|FROM|BETWEEN) (?:YOUR |MY )?(?:ACCOUNTS?|SAVINGS|CHEQUING)/i
+export const isOwnTransfer = (raw) => OWN_TRANSFER_RE.test(raw)
+
+/**
+ * What an entry is to HomeBoard: `plan` (typed in Expensave), `matched` (a bank row that confirmed a plan entry),
+ * `bank` (a bank row nothing planned), `transfer` (between the household's own accounts) or `balance`.
+ */
+export function entryKind(e) {
+  if (isBalanceUpdate(e) || tagOf(e) === 'balance') return 'balance'
+  if (!isImported(e)) return 'plan'
+  const raw = rawOf(e)
+  // a new row is named after the bank's description; a confirmed plan entry keeps its own name
+  if ((e.label ?? '') !== (cleanLabel(raw) || raw || '—')) return 'matched'
+  return isOwnTransfer(raw) ? 'transfer' : 'bank'
+}
+
+const squash = (s) => s.replace(/\s+/g, ' ').trim().toUpperCase()
+/** True when `early` is how the bank showed a transaction before it posted ("DÉPÔT DE PAIE") and `late` its final text. */
+const isEarlyForm = (early, late) => {
+  const a = squash(early)
+  const b = squash(late)
+  return a.length > 0 && a.length < b.length && b.startsWith(a)
+}
+const sameTransaction = (e, day, amount) => dayOf(e) === day && sameCents(e.amount, amount)
 
 const planView = (e) => ({
   id: e.id,
@@ -182,14 +215,64 @@ const planView = (e) => ({
   category: e.category?.name ?? null,
 })
 
+/**
+ * Rows earlier uploads wrote twice: once while pending, once posted. The posted one stays, unless the pending one
+ * confirmed a plan entry: then that one keeps its name and takes the posted description (and fingerprint).
+ */
+export function findTwins(entries) {
+  const imported = entries.filter(isImported)
+  const used = new Set()
+  const twins = []
+  for (const early of imported) {
+    if (used.has(early)) continue
+    const late = imported.find((e) => e !== early && !used.has(e) &&
+      sameTransaction(e, dayOf(early), early.amount) && isEarlyForm(rawOf(early), rawOf(e)))
+    if (!late) continue
+    used.add(early)
+    used.add(late)
+    const keepEarly = entryKind(early) === 'matched'
+    const [keep, drop] = keepEarly ? [early, late] : [late, early]
+    twins.push({ keep: keep.id, drop: planView(drop), dropTag: tagOf(drop), ...(keepEarly ? { description: late.description } : {}) })
+  }
+  return twins
+}
+
 /** What an upload would change, given the calendar's raw entries around the statement. */
 export function reconcile(rows, entries) {
   const from = rows[0].date
   const to = rows[rows.length - 1].date
-  const importedTags = new Set(entries.map(tagOf).filter((t) => t && t !== 'balance'))
+  const imported = entries.filter(isImported)
+  const importedTags = new Set(imported.map(tagOf))
+  const statementTags = new Set(rows.map((r) => r.fp))
+  const twins = findTwins(entries)
+  const twinIds = new Set(twins.flatMap((t) => [t.keep, t.drop.id]))
 
-  const duplicates = rows.filter((r) => importedTags.has(r.fp))
-  const fresh = rows.filter((r) => !importedTags.has(r.fp))
+  // a row imported while pending comes back with its posted description: it is updated, never added twice
+  const earlier = imported.filter((e) => !statementTags.has(tagOf(e)) && !twinIds.has(e.id))
+  const claimed = new Set()
+  const fresh = []
+  const refreshed = []
+  const stillPending = []
+  let duplicates = 0
+  for (const r of rows) {
+    if (importedTags.has(r.fp)) {
+      duplicates++
+      continue
+    }
+    const e = earlier.find((x) => !claimed.has(x) && sameTransaction(x, r.date, r.amount) &&
+      (isEarlyForm(rawOf(x), r.raw) || isEarlyForm(r.raw, rawOf(x))))
+    if (!e) {
+      fresh.push(r)
+      continue
+    }
+    claimed.add(e)
+    if (isEarlyForm(rawOf(e), r.raw)) refreshed.push({ entry: planView(e), kind: entryKind(e), row: r })
+    else {
+      // this file still shows it pending; the posted row is already in
+      stillPending.push(r)
+      duplicates++
+    }
+  }
 
   // entries that are still a plan: not ours, not Expensave's balance anchors
   const planned = entries.filter((e) => !tagOf(e) && !isBalanceUpdate(e) && dayOf(e))
@@ -257,39 +340,96 @@ export function reconcile(rows, entries) {
     })
     .sort((a, b) => a.date.localeCompare(b.date))
 
-  // earlier HomeBoard anchors inside the window get superseded by the new one
-  const staleAnchors = entries
-    .filter((e) => tagOf(e) === 'balance' && dayOf(e) >= from && dayOf(e) <= to)
-    .map((e) => e.id)
-
   return {
     from,
     to,
     count: rows.length,
+    rows,
     matched,
     added,
-    duplicates: duplicates.length,
+    refreshed,
+    twins,
+    duplicates,
+    // statement rows whose own fingerprint won't be in Expensave: their posted twin is
+    unwritten: [...stillPending.map((r) => r.fp), ...twins.filter((t) => !t.description).map((t) => t.dropTag)],
     missing,
-    staleAnchors,
     // the export's own running balance, when it has one, is the anchor
     bankBalance: [...rows].reverse().find((r) => r.balance != null)?.balance ?? null,
   }
 }
 
-/** Confirmed balance at the end of the statement once `plan` is applied; `base` precedes the first entry. */
-export function balanceAfter(plan, entries, base, decisions = {}) {
-  const removed = new Set(plan.staleAnchors)
+/** The newest balance update before `day`: from there on the ledger has to add up by itself. */
+export const latestAnchor = (anchors, day) =>
+  anchors.filter((a) => a.date < day).sort((a, b) => a.date.localeCompare(b.date)).pop() ?? null
+
+/**
+ * What this upload adds to `day` beyond its earlier balance update. That update holds the balance when the last
+ * file was exported, often mid-day: bank rows new on that day happened after, and replace what was planned there.
+ */
+export function landedOn(plan, day) {
+  const rows = [...plan.matched.flatMap((m) => m.rows), ...plan.added].filter((r) => r.date === day)
+  const replaced = plan.matched.filter((m) => m.entry.confirmed && m.entry.date === day)
+  return round2(rows.reduce((s, r) => s + r.amount, 0) - replaced.reduce((s, m) => s + m.entry.amount, 0))
+}
+
+/**
+ * Confirmed balance at the end of the statement once `plan` is applied. It counts from the newest balance update
+ * before the statement's last day (`anchors` hold absolute end-of-day balances), else from `base`, the balance
+ * before the first entry.
+ */
+export function balanceAfter(plan, entries, base, decisions = {}, anchors = []) {
+  const start = latestAnchor(anchors, plan.to)
+  const counts = (day) => day <= plan.to && (!start || day > start.date)
+  const skipped = new Set([...plan.twins.map((t) => t.drop.id), ...plan.matched.map((m) => m.entry.id), ...anchors.map((a) => a.id)])
   for (const m of plan.missing) {
     const action = decisions[m.id] ?? m.action
-    if (action === 'remove' || action === 'pending') removed.add(m.id)
+    if (action === 'remove' || action === 'pending') skipped.add(m.id)
   }
-  const matchedIds = new Set(plan.matched.map((m) => m.entry.id))
-  let total = base
+  let total = start ? start.balance + landedOn(plan, start.date) : base
   for (const e of entries) {
-    if (e.confirmed === false || removed.has(e.id) || matchedIds.has(e.id)) continue
-    if (dayOf(e) <= plan.to) total += e.amount
+    if (e.confirmed !== false && !skipped.has(e.id) && counts(dayOf(e))) total += e.amount
   }
-  for (const m of plan.matched) for (const r of m.rows) total += r.amount
-  for (const r of plan.added) total += r.amount
+  for (const r of [...plan.matched.flatMap((m) => m.rows), ...plan.added]) if (counts(r.date)) total += r.amount
   return round2(total)
+}
+
+/** What the plan alone expected between `start` (a balance update) and `to`; null once bank rows are in that span. */
+export function planSince(entries, start, to) {
+  if (!start) return null
+  const span = entries.filter((e) => dayOf(e) > start.date && dayOf(e) <= to)
+  if (span.some(isImported)) return null
+  return round2(span.filter((e) => entryKind(e) === 'plan').reduce((total, e) => total + e.amount, 0))
+}
+
+/** Rhythms a repeating charge can follow: name, days apart, slack in days. */
+const RHYTHMS = [['week', 7, 2], ['twoWeeks', 14, 3], ['month', 30.4, 4]]
+// "VIREMENT EN LIGNE ENVOYÉ - 1234 JANE DOE" and "… - 5678 JANE DOE" are the same payee
+const payeeKey = (label) => squash(label.replace(/\d{3,}/g, ' ').replace(/[-*#]/g, ' '))
+
+/**
+ * Charges that come back on a rhythm at the same amount: worth adding to the plan so they are reserved on their day.
+ * `rows` are `{ date, amount, label }` the plan didn't announce.
+ */
+export function recurringCandidates(rows) {
+  const groups = new Map()
+  for (const r of rows) {
+    if (r.amount >= 0) continue
+    const key = payeeKey(r.label)
+    groups.set(key, [...(groups.get(key) ?? []), r])
+  }
+  const found = []
+  for (const list of groups.values()) {
+    if (list.length < 2) continue
+    list.sort((a, b) => a.date.localeCompare(b.date))
+    const amounts = list.map((r) => r.amount).sort((a, b) => a - b)
+    const typical = amounts[Math.floor(amounts.length / 2)]
+    if (!amounts.every((a) => Math.abs(a - typical) <= Math.max(1, Math.abs(typical) * 0.05))) continue
+    const gaps = list.slice(1).map((r, i) => dayNum(r.date) - dayNum(list[i].date))
+    const rhythm = RHYTHMS.find(([, days, slack]) => gaps.every((g) => Math.abs(g - days) <= slack))
+    // two charges a week apart prove little; two a month apart are worth a look
+    if (!rhythm || (rhythm[0] !== 'month' && list.length < 3)) continue
+    const last = list[list.length - 1]
+    found.push({ label: last.label, amount: round2(typical), every: rhythm[0], last: last.date, count: list.length })
+  }
+  return found.sort((a, b) => a.amount - b.amount)
 }

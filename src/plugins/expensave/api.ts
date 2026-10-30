@@ -40,8 +40,21 @@ export const getImportStatus = () => importCall<{ lastImport: BankImportStatus |
 
 export const previewBankImport = (request: ImportRequest) => importCall<BankPreview>('preview', request)
 
-export const applyBankImport = (request: ImportRequest & { balance?: number | null; decisions?: Record<number, 'remove' | 'pending'> }) =>
-  importCall<ImportResult>('apply', request)
+export const applyBankImport = (request: ImportRequest & {
+  balance?: number | null
+  forecast?: number | null
+  decisions?: Record<number, 'remove' | 'pending'>
+}) => importCall<ImportResult>('apply', request)
+
+/** Records money moved to savings today, so the set-aside amount drops right away. */
+export async function recordSetAside(body: { calendar: number; amount: number; label: string; date: string }): Promise<void> {
+  const r = await fetch(url('set-aside'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? `HTTP ${r.status}`)
+}
 
 /** Bank exports are UTF-8 these days, older ones Windows-1252. */
 export async function readStatementFile(file: File): Promise<string> {

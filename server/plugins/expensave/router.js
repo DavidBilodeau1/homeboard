@@ -1,9 +1,11 @@
 import express from 'express'
+import { categoryNamed, entryKind } from './bankImport.js'
 import { importRouter } from './importRouter.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const CACHE_MS = 45_000
 const CACHE_MAX_ENTRIES = 40
+const SAVINGS_CATEGORIES = ['Savings', 'Épargne', 'Epargne', 'Transfer', 'Transfert']
 
 // Expensave serialises DateTimes as 'Y-m-d H:i:s' in the household's timezone.
 const dayOf = (v) => (typeof v === 'string' && v.length >= 10 ? v.slice(0, 10) : null)
@@ -23,6 +25,7 @@ const toTransaction = (e, calendarId) => ({
   at: e.createdAt ?? null,
   recurring: !!e.recurring,
   frequency: e.recurringFrequency ?? null,
+  kind: entryKind(e),
 })
 
 const toDay = (b) => ({
@@ -80,6 +83,7 @@ const parseIds = (text) =>
 export function expensaveRouter(api, opts = {}) {
   const router = express.Router()
   const cache = createCache()
+  const canWrite = opts.canWrite !== false
   const calendars = () => cache.get('calendars', () => api.calendars()).then((list) => (Array.isArray(list) ? list : []).map(toCalendar))
 
   router.use('/import', importRouter(api, { ...opts, onChange: cache.clear }))
@@ -129,7 +133,34 @@ export function expensaveRouter(api, opts = {}) {
         transactions: ledgers.flatMap((l) => l.transactions).sort((a, b) => (a.at ?? '').localeCompare(b.at ?? '')),
         days: mergeDays(ledgers.map((l) => l.days)),
         errors: ledgers.map((l) => l.error).filter(Boolean),
+        canWrite,
       })
+    } catch (e) {
+      res.status(502).json({ error: e.message })
+    }
+  })
+
+  /** Records money just moved to savings, so the set-aside amount drops before the bank statement shows it. */
+  router.post('/set-aside', async (req, res) => {
+    if (!canWrite) return res.status(403).json({ error: 'editor disabled (EDITOR_ENABLED=0)' })
+    const { calendar, amount, label, date } = req.body ?? {}
+    const valid = Number.isInteger(calendar) && Number.isFinite(amount) && amount > 0 &&
+      typeof label === 'string' && label.trim() && DATE_RE.test(date ?? '')
+    if (!valid) return res.status(400).json({ error: 'calendar, a positive amount, a label and a YYYY-MM-DD date are required' })
+    try {
+      const category = categoryNamed(await api.categories().catch(() => []), SAVINGS_CATEGORIES)
+      // a plan entry like any other: the next statement's transfer confirms it
+      const row = await api.createExpense({
+        calendar: { id: calendar },
+        ...(category ? { category: { id: category } } : {}),
+        label: label.trim().slice(0, 100),
+        amount: -round2(amount),
+        createdAt: `${date} 12:00:00`,
+        confirmed: true,
+        description: null,
+      })
+      cache.clear()
+      res.json({ id: row?.id ?? null })
     } catch (e) {
       res.status(502).json({ error: e.message })
     }

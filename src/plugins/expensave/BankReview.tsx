@@ -2,24 +2,15 @@ import React, { useState } from 'react'
 import { CloseIcon } from '../../icons'
 import { useStore } from '../../store'
 import { applyBankImport, type ImportResult } from './api'
-import { fmtMoney } from './money'
+import { fmtMoney, parseAmount, statementForecast } from './money'
 import { useMoney } from './MoneyProvider'
-import type { BankPlanned, BankPreview } from './types'
+import type { BankPlanned, BankPreview, RecurringCharge } from './types'
 
 type Decision = 'remove' | 'pending'
 const DECISIONS: Decision[] = ['remove', 'pending']
 
 export const shortDate = (day: string, locale: string) =>
   new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(new Date(`${day}T00:00:00`))
-
-/** "1 234,56", "1,234.56", "$1234.5" → 1234.56; null when it is not a number. */
-const parseAmount = (text: string): number | null => {
-  const compact = text.replace(/[\s$\u00a0]/g, '')
-  if (!compact) return null
-  const decimalComma = /,\d{1,2}$/.test(compact)
-  const value = Number(decimalComma ? compact.replace(/\./g, '').replace(',', '.') : compact.replace(/,/g, ''))
-  return Number.isFinite(value) ? Math.round(value * 100) / 100 : null
-}
 
 const sign = (amount: number) => (amount >= 0 ? 'in' : 'out')
 
@@ -29,7 +20,23 @@ function useFormat() {
   return (amount: number) => fmtMoney(amount, locale, money?.currency ?? 'CAD')
 }
 
-function BalanceSection({ preview, text, onText, busy }: { preview: BankPreview; text: string; onText: (text: string) => void; busy: boolean }) {
+/** Since the last bank balance, the file plus Expensave should land exactly on what the bank shows. */
+function AddsUp({ preview, correction }: { preview: BankPreview; correction: number }) {
+  const { locale, t } = useStore()
+  const format = useFormat()
+  if (!preview.balanceFrom) return null
+  const date = shortDate(preview.balanceFrom.date, locale)
+  if (Math.abs(correction) < 1) return <p className="bank-ok">{t('bank.addsUp', { date })}</p>
+  return <p className="bank-warn">{t(correction > 0 ? 'bank.short' : 'bank.over', { date, amount: format(Math.abs(correction)) })}</p>
+}
+
+function BalanceSection({ preview, text, onText, forecast, busy }: {
+  preview: BankPreview
+  text: string
+  onText: (text: string) => void
+  forecast: number | null
+  busy: boolean
+}) {
   const { locale, t } = useStore()
   const format = useFormat()
   const balance = parseAmount(text)
@@ -45,7 +52,11 @@ function BalanceSection({ preview, text, onText, busy }: { preview: BankPreview;
         {!!correction && (
           <div><span>{t('bank.correction')}</span><b className={correction > 0 ? 'in' : 'out'}>{correction > 0 ? '+' : ''}{format(correction)}</b></div>
         )}
+        {forecast != null && balance != null && (
+          <div><span>{t('bank.forecast', { date: shortDate(preview.to, locale) })}</span><b>{format(forecast)}</b></div>
+        )}
       </div>
+      {correction != null && <AddsUp preview={preview} correction={correction} />}
       <p className="settings-note">{balance == null ? t('bank.balanceMissing') : t('bank.balanceHint')}</p>
     </section>
   )
@@ -114,6 +125,41 @@ function AddedSection({ added }: { added: BankPreview['added'] }) {
   )
 }
 
+function TwinsSection({ twins }: { twins: BankPlanned[] }) {
+  const { locale, t } = useStore()
+  const format = useFormat()
+  return (
+    <details className="bank-section">
+      <summary>{t('bank.twins', { count: twins.length })}</summary>
+      {twins.map((entry) => (
+        <div className="bank-row" key={entry.id}>
+          <span className="bank-day">{shortDate(entry.date, locale)}</span>
+          <span className="bank-label">{entry.label}</span>
+          <span className={`mny-amt ${sign(entry.amount)}`}>{format(entry.amount)}</span>
+        </div>
+      ))}
+    </details>
+  )
+}
+
+function RecurringSection({ charges }: { charges: RecurringCharge[] }) {
+  const { t } = useStore()
+  const format = useFormat()
+  return (
+    <details className="bank-section">
+      <summary>{t('bank.recurring', { count: charges.length })}</summary>
+      <p className="settings-note">{t('bank.recurringHint')}</p>
+      {charges.map((charge) => (
+        <div className="bank-row" key={`${charge.label}${charge.amount}`}>
+          <span className="bank-day">{t(`bank.every.${charge.every}`)}</span>
+          <span className="bank-label">{charge.label}</span>
+          <span className="mny-amt out">{format(charge.amount)}</span>
+        </div>
+      ))}
+    </details>
+  )
+}
+
 interface Props {
   preview: BankPreview
   csv: string
@@ -125,6 +171,8 @@ interface Props {
 /** Everything a statement upload would change, confirmed before anything is written. */
 export function BankReview({ preview, csv, onClose, onDone, onAccount }: Props) {
   const { locale, t } = useStore()
+  const { money } = useMoney()
+  const forecast = statementForecast(preview, money?.plan.everyday?.perDay ?? 0)
   const [balanceText, setBalanceText] = useState(preview.bankBalance != null ? String(preview.bankBalance) : '')
   const [decisions, setDecisions] = useState<Record<number, Decision>>(() => Object.fromEntries(preview.missing.map((m) => [m.id, m.action])))
   const [busy, setBusy] = useState(false)
@@ -132,13 +180,14 @@ export function BankReview({ preview, csv, onClose, onDone, onAccount }: Props) 
 
   const balance = parseAmount(balanceText)
   const changesSomething = preview.matched.length > 0 || preview.added.length > 0 || balance != null ||
+    preview.refreshed.length > 0 || preview.twins.length > 0 ||
     preview.missing.some((m) => decisions[m.id] === 'remove' || m.confirmed)
 
   const apply = async () => {
     setBusy(true)
     setError(null)
     try {
-      onDone(await applyBankImport({ csv, calendar: preview.calendar.id, account: preview.account, balance, decisions }))
+      onDone(await applyBankImport({ csv, calendar: preview.calendar.id, account: preview.account, balance, forecast, decisions }))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setBusy(false)
@@ -165,7 +214,7 @@ export function BankReview({ preview, csv, onClose, onDone, onAccount }: Props) 
               </select>
             </label>
           )}
-          <BalanceSection preview={preview} text={balanceText} onText={setBalanceText} busy={busy} />
+          <BalanceSection preview={preview} text={balanceText} onText={setBalanceText} forecast={forecast} busy={busy} />
           {preview.gapDays > 0 && preview.lastImport && (
             <p className="bank-warn">{t('bank.gap', { count: preview.gapDays, days: preview.gapDays, date: shortDate(preview.lastImport.to, locale) })}</p>
           )}
@@ -175,6 +224,9 @@ export function BankReview({ preview, csv, onClose, onDone, onAccount }: Props) 
           )}
           {preview.matched.length > 0 && <MatchedSection matched={preview.matched} />}
           {preview.added.length > 0 && <AddedSection added={preview.added} />}
+          {preview.twins.length > 0 && <TwinsSection twins={preview.twins} />}
+          {preview.recurring.length > 0 && <RecurringSection charges={preview.recurring} />}
+          {preview.refreshed.length > 0 && <p className="settings-note">{t('bank.refreshed', { count: preview.refreshed.length })}</p>}
           {preview.duplicates > 0 && <p className="settings-note">{t('bank.duplicates', { count: preview.duplicates })}</p>}
           {error && <p className="settings-note mny-err">{error}</p>}
         </div>

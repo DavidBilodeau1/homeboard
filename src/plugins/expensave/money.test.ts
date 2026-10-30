@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { groupByDay, moneyRange, savingsPlan, startOfWeek, weeklyMoney } from './money'
-import type { MoneyDay, Transaction } from './types'
+import {
+  everydaySpending, groupByDay, moneyRange, parseAmount, recentSpending, savingsPlan, startOfWeek, statementForecast, weeklyMoney,
+} from './money'
+import type { MoneyDay, Transaction, TransactionKind } from './types'
 
 const TODAY = new Date(2026, 8, 10) // Thursday 2026-09-10
 
@@ -14,6 +16,7 @@ const txn = (date: string, amount: number, extra: Partial<Transaction> = {}): Tr
   category: null,
   date,
   at: `${date} 12:00:00`,
+  kind: 'plan',
   recurring: false,
   frequency: null,
   ...extra,
@@ -154,5 +157,101 @@ describe('savingsPlan', () => {
     expect(plan.setAside).toBe(0)
     expect(plan.shortfall).toBe(100)
     expect(plan.horizonDays).toBe(14)
+  })
+})
+
+const bank = (date: string, amount: number, kind: TransactionKind = 'bank') => txn(date, amount, { kind })
+
+describe('everydaySpending', () => {
+  // statements cover Aug 21 – Sep 10: weeks of 300, 700 (one big purchase) and 350 of unplanned spending
+  const rows = [
+    bank('2026-08-21', -100),
+    bank('2026-08-25', -200),
+    bank('2026-08-30', -200),
+    bank('2026-09-01', -500),
+    bank('2026-09-05', -350),
+    bank('2026-09-06', -1000, 'transfer'), // to savings
+    bank('2026-09-08', 2000),               // pay
+    bank('2026-09-10', -900, 'matched'),    // a planned bill
+    txn('2026-09-09', -80),                 // still a plan
+  ]
+
+  it('takes the median week of unplanned spending the statements fully cover', () => {
+    expect(everydaySpending(rows)).toEqual({ perDay: 50, perWeek: 350, weeks: 3, source: 'statements' })
+  })
+
+  it('needs two full statement weeks', () => {
+    expect(everydaySpending(rows.filter((t) => t.date >= '2026-09-01'))).toBe(null)
+    expect(everydaySpending([txn('2026-09-09', -80)])).toBe(null)
+  })
+
+  it('tells how the last days went, once the statements cover them', () => {
+    expect(recentSpending(rows, 7)).toBe(50)
+    expect(recentSpending(rows, 60)).toBe(null)
+  })
+})
+
+describe('savingsPlan with a daily target', () => {
+  // usual pace $50/day from the statements above; the target is $20/day
+  const rows = [
+    bank('2026-08-21', -100), bank('2026-08-25', -200), bank('2026-08-30', -200), bank('2026-09-01', -500),
+    bank('2026-09-05', -350), bank('2026-09-10', -1, 'matched'), txn('2026-09-12', -500),
+  ]
+  const plan = savingsPlan(rows, daysUpTo('2026-09-10', 3000), TODAY, { horizonDays: 7, buffer: 1000, dailyTarget: 20 })
+
+  it('reserves the target, so spending less frees money now', () => {
+    expect(plan.everyday).toMatchObject({ perDay: 20, source: 'target' })
+    expect(plan.usual?.perDay).toBe(50)
+    expect(plan.low).toBe(2360)
+    expect(plan.setAside).toBe(1360)
+  })
+
+  it('shows where the usual pace would leave the account once that money has moved', () => {
+    // 3000 − 7 × 50 − 500 = 2150 at the usual pace, minus the 1360 moved out
+    expect(plan.usualLow).toBe(790)
+    expect(plan.usualLowDate).toBe('2026-09-17')
+  })
+
+  it('has nothing to compare without a target', () => {
+    const usual = savingsPlan(rows, daysUpTo('2026-09-10', 3000), TODAY, { horizonDays: 7, buffer: 1000 })
+    expect(usual.everyday?.source).toBe('statements')
+    expect(usual.usualLow).toBe(null)
+    expect(usual.setAside).toBe(1150)
+  })
+})
+
+describe('savingsPlan with everyday spending', () => {
+  // statement through Sep 7, three days before TODAY; $10 a day of everyday spending
+  const rows = [bank('2026-09-07', -20), txn('2026-09-12', -500), txn('2026-09-14', 1000)]
+  const plan = savingsPlan(rows, daysUpTo('2026-09-10', 1000), TODAY, { horizonDays: 7, buffer: 0, dailyTarget: 10 })
+
+  it('takes out what was likely spent since the statement', () => {
+    expect(plan.statementDate).toBe('2026-09-07')
+    expect(plan.statementAge).toBe(3)
+    expect(plan.spentSince).toBe(30)
+  })
+
+  it('reserves everyday spending every day, before the day\'s income', () => {
+    expect(plan.everydayAhead).toBe(70)
+    expect(plan.low).toBe(430)
+    expect(plan.lowDate).toBe('2026-09-14')
+    expect(plan.projected).toBe(1400)
+    expect(plan.setAside).toBe(430)
+  })
+})
+
+describe('statementForecast', () => {
+  it('starts from the last bank balance, adds the plan and takes out everyday spending', () => {
+    const preview = { balanceFrom: { date: '2026-09-01', balance: 1000 }, plannedSince: -300, to: '2026-09-11' }
+    expect(statementForecast(preview, 20)).toBe(500)
+    expect(statementForecast({ ...preview, balanceFrom: null }, 20)).toBe(null)
+  })
+})
+
+describe('parseAmount', () => {
+  it('reads French and English amounts', () => {
+    expect(parseAmount('1 234,56')).toBe(1234.56)
+    expect(parseAmount('$1,234.5')).toBe(1234.5)
+    expect(parseAmount('abc')).toBe(null)
   })
 })
