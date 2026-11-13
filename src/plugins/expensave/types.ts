@@ -19,10 +19,42 @@ export interface ExpensaveSettings extends PluginSettings {
   buffer?: number
   /** savings to move each pay period; moves to your own accounts since payday count toward it */
   payGoal?: number
+  /** what you're saving toward, shown with progress and a projection on the Money page */
+  savingsTargets?: SavingsTarget[]
   /** show the transactions layer on the calendar by default (default true) */
   showInCalendar?: boolean
   /** how often a bank statement should be imported on the Money page (default 14 days) */
   importEveryDays?: number
+}
+
+/** Something you're saving toward by a date. */
+export interface SavingsTarget {
+  name: string
+  amount: number
+  /** YYYY-MM-DD the money is needed by */
+  date: string
+  /** what the savings account held at the end of `balanceDate`, as you last checked */
+  balance?: number
+  balanceDate?: string
+}
+
+/** Where a savings target stands; see targetsProgress() in money.ts. */
+export interface TargetProgress {
+  target: SavingsTarget
+  /** the balance entered plus, for the first target, moves to your own accounts since */
+  saved: number
+  movedSince: number
+  /** the balance is older than the loaded ledger, so moves since are missing: it needs entering again */
+  stale: boolean
+  /** paydays after today, up to the target date */
+  paysLeft: number
+  remaining: number
+  /** needed per pay, this one included, to get there on time */
+  perPay: number
+  /** what the last two complete pay periods freed per pay (first target only) */
+  pace: number | null
+  /** where that pace lands on the target date (first target only) */
+  projected: number | null
 }
 
 /** One bank statement line, as the import preview shows it. */
@@ -253,6 +285,7 @@ export interface MoneyState {
   days: MoneyDay[]
   weeks: MoneyWeek[]
   plan: SavingsPlan
+  targets: TargetProgress[]
   byDay: Map<string, DayMoney>
   currency: string
   errors: string[]
