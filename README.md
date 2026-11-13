@@ -148,6 +148,16 @@ the days since the last statement. Budget-style plan entries (a weekly
 "Groceries" amount) would count that spending twice, so leave them out of the
 plan.
 
+**Savings targets** (an amount by a date, such as an emergency fund) each get
+a card on the Money page. A card shows how far along the target is and what
+each pay has to put in to get there on time. For the first target it also shows
+where the recent pace leads: what the last two complete pay periods freed, from
+the eve of one payday to the eve of the next, counting everything that went in
+and out. Progress is the account balance you last entered. For the first target
+only, transfers to your own accounts made after that day are added on top:
+HomeBoard can't tell which account a transfer went to, so it can't split them
+between targets. Update a balance from its card whenever you check the account.
+
 The *Bank statement* card takes a CSV export (date, description, and amount or
 withdrawal/deposit columns), shows what it would change, and on confirmation
 confirms planned entries, adds new ones, removes or keeps unmatched ones, and

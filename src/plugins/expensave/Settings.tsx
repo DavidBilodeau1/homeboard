@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Field, Note, NumberField } from '../../components/editor/Field'
 import { useStore } from '../../store'
+import { addDays, dayKey } from '../../util'
 import type { SettingsPanelProps } from '../types'
 import { getExpensaveCalendars } from './api'
 import { calendarColor, DEFAULT_CURRENCY, DEFAULT_HORIZON_DAYS, DEFAULT_IMPORT_EVERY_DAYS } from './money'
-import type { ExpensaveCalendar, ExpensaveCalendarCfg, ExpensaveSettings } from './types'
+import type { ExpensaveCalendar, ExpensaveCalendarCfg, ExpensaveSettings, SavingsTarget } from './types'
 
 /** Ticks the Expensave calendars to follow and names and colors each one. */
 function CalendarPicker({ settings, onChange }: { settings: ExpensaveSettings; onChange: (rows: ExpensaveCalendarCfg[]) => void }) {
@@ -45,6 +46,38 @@ function CalendarPicker({ settings, onChange }: { settings: ExpensaveSettings; o
   )
 }
 
+/** Savings targets: a name, an amount, a date, and the account balance as last checked. */
+function TargetsEditor({ targets, onChange }: { targets: SavingsTarget[]; onChange: (rows: SavingsTarget[]) => void }) {
+  const { t } = useStore()
+  const patch = (i: number, change: Partial<SavingsTarget>) => onChange(targets.map((row, j) => (j === i ? { ...row, ...change } : row)))
+  return (
+    <div className="ed-rows">
+      {targets.map((row, i) => (
+        <div className="mny-target-edit" key={i}>
+          <Field label={t('settings.name')}>
+            <input className="ed-input" value={row.name} onChange={(e) => patch(i, { name: e.target.value })} />
+          </Field>
+          <NumberField label={t('money.settings.targetAmount')} min={0} step={500} value={row.amount}
+            onChange={(amount) => patch(i, { amount: amount ?? 0 })} />
+          <Field label={t('money.settings.targetDate')}>
+            <input className="ed-input" type="date" value={row.date} onChange={(e) => patch(i, { date: e.target.value })} />
+          </Field>
+          <NumberField label={t('money.settings.targetBalance')} min={0} step={100} value={row.balance}
+            onChange={(balance) => patch(i, { balance, balanceDate: balance == null ? undefined : row.balanceDate ?? dayKey(new Date()) })} />
+          <Field label={t('money.settings.targetBalanceDate')}>
+            <input className="ed-input" type="date" value={row.balanceDate ?? ''}
+              onChange={(e) => patch(i, { balanceDate: e.target.value || undefined })} />
+          </Field>
+          <button className="ed-del" onClick={() => onChange(targets.filter((_, j) => j !== i))} aria-label={t('settings.remove')}>✕</button>
+        </div>
+      ))}
+      <button className="ed-add" onClick={() => onChange([...targets, { name: '', amount: 0, date: dayKey(addDays(new Date(), 180)) }])}>
+        + {t('settings.add')}
+      </button>
+    </div>
+  )
+}
+
 export function ExpensaveSettingsPanel({ settings, onChange }: SettingsPanelProps<ExpensaveSettings>) {
   const { t } = useStore()
   const set = (change: Partial<ExpensaveSettings>) => onChange({ ...settings, ...change })
@@ -62,6 +95,11 @@ export function ExpensaveSettingsPanel({ settings, onChange }: SettingsPanelProp
       <NumberField label={t('money.settings.buffer')} min={0} step={50} value={settings.buffer} fallback={0}
         onChange={(buffer) => set({ buffer })} />
       <Note>{t('money.settings.goalHint')}</Note>
+      <Field label={t('money.settings.targets')}>
+        <TargetsEditor targets={settings.savingsTargets ?? []}
+          onChange={(rows) => set({ savingsTargets: rows.length ? rows : undefined })} />
+      </Field>
+      <Note>{t('money.settings.targetsHint')}</Note>
       <NumberField label={t('money.settings.importEvery')} min={1} max={90} value={settings.importEveryDays} fallback={DEFAULT_IMPORT_EVERY_DAYS}
         onChange={(importEveryDays) => set({ importEveryDays })} />
       <Field label={t('money.settings.show')}>

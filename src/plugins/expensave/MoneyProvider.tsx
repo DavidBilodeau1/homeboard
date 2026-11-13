@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useStore } from '../../store'
 import { usePluginSettings } from '../settings'
 import { getExpensaveRange } from './api'
-import { currencyOf, groupByDay, moneyRange, savingsPlan, weeklyMoney } from './money'
+import { currencyOf, groupByDay, moneyRange, savingsPlan, targetsProgress, weeklyMoney } from './money'
 import type { ExpensaveSettings, MoneyState } from './types'
 
 const REFRESH_MS = 5 * 60_000
@@ -37,6 +37,7 @@ export function MoneyProvider({ active, children }: { active: boolean; children:
         days: payload.days,
         weeks: weeklyMoney(payload.transactions, today),
         plan: savingsPlan(payload.transactions, payload.days, today, settings),
+        targets: targetsProgress(settings.savingsTargets ?? [], payload.transactions, payload.days, today, payload.start),
         byDay: groupByDay(payload.transactions),
         currency: currencyOf(settings),
         errors: payload.errors,
