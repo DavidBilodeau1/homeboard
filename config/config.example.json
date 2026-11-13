@@ -61,7 +61,8 @@
   },
   "plugins": {
     "frigate": { "enabled": false, "refreshSeconds": 8, "pollSeconds": 15, "alertLimit": 20 },
-    "expensave": { "enabled": false, "currency": "USD", "horizonDays": 14, "buffer": 500, "payGoal": 500 },
+    "expensave": { "enabled": false, "currency": "USD", "horizonDays": 14, "buffer": 500, "payGoal": 500,
+      "savingsTargets": [{ "name": "Emergency fund", "amount": 6000, "date": "2027-06-30" }] },
     "immich": { "enabled": false, "album": "Family" },
     "hockey": { "enabled": false, "entity": "sensor.nhl_mtl" },
     "garbage": {

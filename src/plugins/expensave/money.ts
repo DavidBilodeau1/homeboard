@@ -2,7 +2,10 @@ import type { Translate } from '../../i18n'
 import { addDays, dayKey, monthGrid, startOfMonth } from '../../util'
 import en from './en.json'
 import fr from './fr.json'
-import type { BankImportStatus, BankPreview, DayMoney, Everyday, ExpensaveCalendar, ExpensaveSettings, MoneyDay, MoneyWeek, SavingsPlan, Transaction } from './types'
+import type {
+  BankImportStatus, BankPreview, DayMoney, Everyday, ExpensaveCalendar, ExpensaveSettings, MoneyDay, MoneyWeek, SavingsPlan, SavingsTarget,
+  TargetProgress, Transaction,
+} from './types'
 
 // Sign convention is Expensave's: income is positive, spending negative.
 
@@ -293,6 +296,81 @@ export function savingsPlan(
     lowDate,
     projected,
   }
+}
+
+const DEFAULT_PAY_EVERY_DAYS = 14
+
+/** Running balance at the end of `day`; null when the ledger doesn't reach back that far. */
+const balanceAt = (days: MoneyDay[], day: string) => [...days].reverse().find((d) => d.date <= day)?.balance ?? null
+const eve = (day: string) => dayKey(addDays(new Date(`${day}T00:00:00`), -1))
+const movedBetween = (transactions: Transaction[], from: string, to: string) =>
+  round2(-sum(transactions.filter((t) => isSavingsMove(t) && t.date >= from && t.date <= to).map((t) => t.amount)))
+
+/**
+ * What the last two complete pay periods freed, per pay: the balance from the eve of one payday to the eve of the
+ * next, plus what moved to savings in between. Everything counts — bills, everyday spending, one-offs, other income —
+ * so it's what that way of living leaves to save. Null until a complete period is in the window.
+ */
+export function freedPerPay(transactions: Transaction[], days: MoneyDay[], today: Date): number | null {
+  const todayKey = dayKey(today)
+  const bounds = paydays(transactions).filter((d) => d <= todayKey && balanceAt(days, eve(d)) != null).slice(-3)
+  if (bounds.length < 2) return null
+  let freed = 0
+  for (let i = 1; i < bounds.length; i++) {
+    const [from, to] = [bounds[i - 1], bounds[i]]
+    freed += balanceAt(days, eve(to))! - balanceAt(days, eve(from))! + movedBetween(transactions, from, eve(to))
+  }
+  return round2(freed / (bounds.length - 1))
+}
+
+/**
+ * Where each savings target stands. Progress is the balance you last entered plus, for the first target only, what
+ * moved to your own accounts since that day — HomeBoard can't tell which account a move went to, so it can't split
+ * moves between targets. The pace (what recent pay periods freed) goes to the first target too.
+ */
+export function targetsProgress(
+  targets: SavingsTarget[],
+  transactions: Transaction[],
+  days: MoneyDay[],
+  today: Date,
+  windowStart: string,
+): TargetProgress[] {
+  const todayKey = dayKey(today)
+  const pays = paydays(transactions)
+  const lastPay = pays.filter((d) => d <= todayKey).at(-1) ?? null
+  const every = pays.length >= 2 ? daysBetween(pays[pays.length - 2], pays[pays.length - 1]) : DEFAULT_PAY_EVERY_DAYS
+  const anchor = new Date(`${lastPay ?? todayKey}T00:00:00`)
+  const pace = freedPerPay(transactions, days, today)
+  const movedThisPay = lastPay ? movedBetween(transactions, lastPay, todayKey) : 0
+
+  return targets.map((target, i) => {
+    const counts = i === 0 && !!target.balanceDate
+    const since = target.balanceDate ? dayKey(addDays(new Date(`${target.balanceDate}T00:00:00`), 1)) : todayKey
+    const movedSince = counts ? movedBetween(transactions, since, todayKey) : 0
+    const saved = round2((target.balance ?? 0) + movedSince)
+    let paysLeft = 0
+    for (let k = 1; every > 0; k++) {
+      const pay = dayKey(addDays(anchor, k * every))
+      if (pay > target.date) break
+      if (pay > todayKey) paysLeft++
+    }
+    const remaining = Math.max(0, round2(target.amount - saved))
+    const projected = i === 0 && pace != null
+      ? round2(saved + Math.max(0, pace - movedThisPay) + Math.max(0, pace) * paysLeft)
+      : null
+    return {
+      target,
+      saved,
+      movedSince,
+      // moves before the window are missing, so the balance needs entering again
+      stale: counts && since < windowStart,
+      paysLeft,
+      remaining,
+      perPay: target.date > todayKey ? round2(remaining / (paysLeft + 1)) : remaining,
+      pace: i === 0 ? pace : null,
+      projected,
+    }
+  })
 }
 
 /** What the Money page expected for a statement's last day: the previous bank balance, the plan, everyday spending. */

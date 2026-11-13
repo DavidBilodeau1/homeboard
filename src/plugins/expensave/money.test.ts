@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  everydaySpending, groupByDay, moneyRange, parseAmount, paydays, savingsPlan, startOfWeek, statementForecast, weeklyMoney,
+  everydaySpending, freedPerPay, groupByDay, moneyRange, parseAmount, paydays, savingsPlan, startOfWeek, statementForecast,
+  targetsProgress, weeklyMoney,
 } from './money'
 import type { MoneyDay, Transaction, TransactionKind } from './types'
 
@@ -284,6 +285,61 @@ describe('savingsPlan with everyday spending', () => {
     expect(plan.projected).toBe(970)
     // and what is left to spend is exactly that pace
     expect(plan.allowance).toEqual({ perDay: 10, floor: 'cushion' })
+  })
+})
+
+describe('savings targets', () => {
+  // paid every second Thursday; the eves of the last three paydays end at 1000, 1200 and 900
+  const rows = [
+    bank('2026-08-13', 2000, 'bank', 'DÉPÔT DE PAIE'),
+    bank('2026-08-14', -500, 'transfer'),
+    bank('2026-08-27', 2000, 'bank', 'DÉPÔT DE PAIE'),
+    bank('2026-09-01', -700, 'transfer'),
+    bank('2026-09-02', 100, 'transfer'),    // back from savings
+    bank('2026-09-10', 2000, 'bank', 'DÉPÔT DE PAIE'),
+    bank('2026-09-10', -300, 'transfer'),   // this pay
+    txn('2026-09-24', 2000, { label: 'Paye' }),
+  ]
+  const days: MoneyDay[] = [
+    { date: '2026-08-12', income: 0, expense: 0, net: 0, balance: 1000 },
+    { date: '2026-08-26', income: 0, expense: 0, net: 0, balance: 1200 },
+    { date: '2026-09-09', income: 0, expense: 0, net: 0, balance: 900 },
+    { date: '2026-09-10', income: 0, expense: 0, net: 0, balance: 2600 },
+  ]
+  const fund = { name: 'Fund', amount: 10000, date: '2026-12-31', balance: 2000, balanceDate: '2026-09-01' }
+  const other = { name: 'Other', amount: 5000, date: '2026-10-31', balance: 4000, balanceDate: '2026-09-01' }
+
+  it('measures what each complete pay period freed, moves to savings included', () => {
+    // (1200 − 1000 + 500) and (900 − 1200 + 600), averaged
+    expect(freedPerPay(rows, days, TODAY)).toBe(500)
+    expect(freedPerPay(rows, days.slice(2), TODAY)).toBe(null)
+  })
+
+  it('adds the moves since the balance was entered, and projects the recent pace to the date', () => {
+    const [progress] = targetsProgress([fund], rows, days, TODAY, '2026-08-01')
+    expect(progress.movedSince).toBe(200)      // 300 out this pay, 100 back on the 2nd
+    expect(progress.saved).toBe(2200)
+    expect(progress.paysLeft).toBe(8)          // Sep 24 … Dec 31
+    expect(progress.perPay).toBe(866.67)       // 7800 over 9 pays, this one included
+    expect(progress.pace).toBe(500)
+    // 2200, the 200 this pay hasn't moved yet, then 8 × 500
+    expect(progress.projected).toBe(6400)
+    expect(progress.stale).toBe(false)
+  })
+
+  it('gives moves and the pace to the first target only', () => {
+    const [, second] = targetsProgress([fund, other], rows, days, TODAY, '2026-08-01')
+    expect(second).toMatchObject({ saved: 4000, movedSince: 0, paysLeft: 3, perPay: 250, pace: null, projected: null })
+  })
+
+  it('asks for the balance again once it predates the loaded ledger', () => {
+    const [progress] = targetsProgress([{ ...fund, balanceDate: '2026-07-01' }], rows, days, TODAY, '2026-08-01')
+    expect(progress.stale).toBe(true)
+  })
+
+  it('starts from zero until a balance is entered', () => {
+    const [progress] = targetsProgress([{ name: 'New', amount: 1000, date: '2026-10-08' }], rows, days, TODAY, '2026-08-01')
+    expect(progress).toMatchObject({ saved: 0, movedSince: 0, paysLeft: 2, perPay: 333.33 })
   })
 })
 

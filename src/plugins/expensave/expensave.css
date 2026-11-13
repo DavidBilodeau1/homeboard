@@ -30,8 +30,22 @@
   grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.3fr);
   grid-template-areas: 'hero weeks' 'bank upcoming' 'accounts upcoming';
 }
+.mny-page.has-targets { grid-template-areas: 'hero weeks' 'targets upcoming' 'bank upcoming' 'accounts upcoming'; }
 /* only the hero stretches to the week list's height */
-.mny-upcoming, .mny-accounts, .mny-bank { align-self: start; }
+.mny-upcoming, .mny-accounts, .mny-bank, .mny-targets { align-self: start; }
+.mny-targets { grid-area: targets; display: flex; flex-direction: column; gap: 16px; }
+.mny-target-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.mny-target-head b { font-size: 1.75rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mny-target-head b.in { color: var(--in); }
+.mny-target-head span { color: var(--muted); font-weight: 600; font-size: 0.8125rem; }
+.mny-target-bar { height: 8px; border-radius: 999px; background: var(--bg); margin: 8px 0 12px; overflow: hidden; }
+.mny-target-bar span { display: block; height: 100%; border-radius: 999px; background: var(--in); }
+.mny-target-line { margin: 0 0 4px; font-size: 0.8125rem; font-weight: 600; }
+.mny-target-line.in { color: var(--in); }
+.mny-target-line.out { color: var(--out); }
+.mny-target .mny-basis { margin-top: 8px; }
+.mny-target-edit { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.mny-target-edit .ed-del { align-self: flex-end; }
 .mny-hero { grid-area: hero; display: flex; flex-direction: column; }
 .mny-weeks { grid-area: weeks; }
 .mny-upcoming { grid-area: upcoming; }
@@ -163,6 +177,7 @@
 
 @media (max-width: 1120px) {
   .mny-page { grid-template-columns: 1fr; grid-template-areas: 'hero' 'bank' 'weeks' 'upcoming' 'accounts'; height: auto; }
+  .mny-page.has-targets { grid-template-areas: 'hero' 'targets' 'bank' 'weeks' 'upcoming' 'accounts'; }
 }
 @media (max-width: 700px) {
   .mny-hero-value { font-size: 2.25rem; }

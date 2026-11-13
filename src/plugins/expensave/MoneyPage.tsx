@@ -8,6 +8,7 @@ import { recordSetAside } from './api'
 import { BankImport } from './BankImport'
 import { calendarColor, calendarName, DEFAULT_IMPORT_EVERY_DAYS, fmtMoney, fmtWeekRange, ONE_OFF_MIN, parseAmount, untilLabel } from './money'
 import { useMoney } from './MoneyProvider'
+import { SavingsTargets } from './SavingsTargets'
 import type { ExpensaveSettings, MoneyState, MoneyWeek, SavingsPlan, Transaction } from './types'
 
 const TYPICAL_WEEKS = 4
@@ -327,8 +328,9 @@ export function MoneyPage() {
   }
 
   return (
-    <div className="mny-page">
+    <div className={`mny-page${money.targets.length ? ' has-targets' : ''}`}>
       <SetAsideCard money={money} settings={settings} />
+      <SavingsTargets money={money} settings={settings} />
       <WeeksCard weeks={money.weeks} currency={money.currency} />
       <BankImport />
       <UpcomingCard money={money} />
