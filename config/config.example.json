@@ -61,7 +61,7 @@
   },
   "plugins": {
     "frigate": { "enabled": false, "refreshSeconds": 8, "pollSeconds": 15, "alertLimit": 20 },
-    "expensave": { "enabled": false, "currency": "USD", "horizonDays": 14, "buffer": 500, "weeklyGoal": 200 },
+    "expensave": { "enabled": false, "currency": "USD", "horizonDays": 14, "buffer": 500, "payGoal": 500 },
     "immich": { "enabled": false, "album": "Family" },
     "hockey": { "enabled": false, "entity": "sensor.nhl_mtl" },
     "garbage": {

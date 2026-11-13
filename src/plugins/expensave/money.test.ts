@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  everydaySpending, groupByDay, moneyRange, parseAmount, recentSpending, savingsPlan, startOfWeek, statementForecast, weeklyMoney,
+  everydaySpending, groupByDay, moneyRange, parseAmount, paydays, savingsPlan, startOfWeek, statementForecast, weeklyMoney,
 } from './money'
 import type { MoneyDay, Transaction, TransactionKind } from './types'
 
@@ -98,32 +98,33 @@ describe('savingsPlan', () => {
   it('leaves only what survives the upcoming bills and the buffer', () => {
     const rows = [
       txn('2026-09-14', -900),   // rent, scheduled
-      txn('2026-09-11', 2150),   // payday, scheduled
+      txn('2026-09-11', 2150),   // income, scheduled
       txn('2026-09-30', -600),   // past the 14-day horizon: not counted
     ]
     const plan = savingsPlan(rows, daysUpTo('2026-09-10', 2480.15), TODAY, { buffer: 500, horizonDays: 14 })
     expect(plan.balance).toBe(2480.15)
+    expect(plan.nextPay).toBe(null)
+    expect(plan.horizonEnd).toBe('2026-09-24')
     expect(plan.upcomingIn).toBe(2150)
     expect(plan.upcomingOut).toBe(-900)
-    expect(plan.projected).toBe(3730.15)
     // the account never dips below today's balance here, so today is the limit
-    expect(plan.low).toBe(2480.15)
     expect(plan.setAside).toBe(1980.15)
-    expect(plan.shortfall).toBe(0)
+    expect(plan.low).toBe(500)
+    expect(plan.projected).toBe(1750)
     expect(plan.commitments.map((t) => t.date)).toEqual(['2026-09-11', '2026-09-14'])
   })
 
-  it('never counts a paycheque that lands after the bill it would cover', () => {
+  it('never counts income that lands after the bill it would cover', () => {
     const rows = [
-      txn('2026-09-12', -1800),  // rent, before payday
-      txn('2026-09-18', 2150),   // payday
+      txn('2026-09-12', -1800),  // rent
+      txn('2026-09-18', 2150),   // income, after rent
     ]
     const plan = savingsPlan(rows, daysUpTo('2026-09-10', 2000), TODAY, { buffer: 0, horizonDays: 14 })
-    // ends the window at 2350, but dips to 200 on the 12th — that is the limit
-    expect(plan.projected).toBe(2350)
-    expect(plan.low).toBe(200)
-    expect(plan.lowDate).toBe('2026-09-12')
+    // the window ends at 2350, but dips to 200 on the 12th — that is the limit
     expect(plan.setAside).toBe(200)
+    expect(plan.low).toBe(0)
+    expect(plan.lowDate).toBe('2026-09-12')
+    expect(plan.projected).toBe(2150)
   })
 
   it('subtracts charges that have not cleared yet', () => {
@@ -138,7 +139,7 @@ describe('savingsPlan', () => {
     const rows = [txn('2026-09-12', -1800)]
     const plan = savingsPlan(rows, daysUpTo('2026-09-10', 1000), TODAY, { buffer: 200, horizonDays: 14 })
     expect(plan.setAside).toBe(0)
-    expect(plan.shortfall).toBe(1000)
+    expect(plan.low).toBe(-800)
     expect(plan.lowDate).toBe('2026-09-12')
   })
 
@@ -155,77 +156,120 @@ describe('savingsPlan', () => {
     const plan = savingsPlan([], [], TODAY, { buffer: 100 })
     expect(plan.balance).toBe(0)
     expect(plan.setAside).toBe(0)
-    expect(plan.shortfall).toBe(100)
+    expect(plan.low).toBe(0)
     expect(plan.horizonDays).toBe(14)
   })
 })
 
-const bank = (date: string, amount: number, kind: TransactionKind = 'bank') => txn(date, amount, { kind })
+const bank = (date: string, amount: number, kind: TransactionKind = 'bank', label = 'x') => txn(date, amount, { kind, label })
 
 describe('everydaySpending', () => {
-  // statements cover Aug 21 – Sep 10: weeks of 300, 700 (one big purchase) and 350 of unplanned spending
+  // statements cover Aug 21 – Sep 10: weeks of 300, 200 (plus a 500 one-off) and 340 of unplanned spending
   const rows = [
     bank('2026-08-21', -100),
     bank('2026-08-25', -200),
     bank('2026-08-30', -200),
-    bank('2026-09-01', -500),
-    bank('2026-09-05', -350),
-    bank('2026-09-06', -1000, 'transfer'), // to savings
+    bank('2026-09-01', -500),               // one-off: says nothing about next week
+    bank('2026-09-05', -340),
+    bank('2026-09-06', -1000, 'transfer'),  // to savings
     bank('2026-09-08', 2000),               // pay
     bank('2026-09-10', -900, 'matched'),    // a planned bill
     txn('2026-09-09', -80),                 // still a plan
   ]
 
-  it('takes the median week of unplanned spending the statements fully cover', () => {
-    expect(everydaySpending(rows)).toEqual({ perDay: 50, perWeek: 350, weeks: 3, source: 'statements' })
+  it('averages the last full statement weeks, leaving out one-offs', () => {
+    expect(everydaySpending(rows)).toEqual({ perDay: 40, perWeek: 280, weeks: 3 })
+  })
+
+  it('looks back only a few weeks, so a quieter stretch shows quickly', () => {
+    const older = [bank('2026-08-14', -399), bank('2026-08-15', -399), bank('2026-08-16', -399)]
+    expect(everydaySpending([...older, ...rows])?.perWeek).toBe(280)
   })
 
   it('needs two full statement weeks', () => {
     expect(everydaySpending(rows.filter((t) => t.date >= '2026-09-01'))).toBe(null)
     expect(everydaySpending([txn('2026-09-09', -80)])).toBe(null)
   })
+})
 
-  it('tells how the last days went, once the statements cover them', () => {
-    expect(recentSpending(rows, 7)).toBe(50)
-    expect(recentSpending(rows, 60)).toBe(null)
+describe('paydays', () => {
+  it('counts a Thursday and a Friday paycheque as one payday, and ignores other income', () => {
+    const rows = [
+      bank('2026-08-27', 3000, 'bank', 'DÉPÔT DE PAIE PAIE/PAYROLL'),
+      bank('2026-08-28', 2400, 'bank', 'DÉPÔT DE PAIE'),
+      txn('2026-09-10', 3000, { label: 'Paye' }),
+      txn('2026-09-11', 2400, { label: 'Paye' }),
+      txn('2026-09-18', 650, { label: 'Allocation' }),
+      txn('2026-09-24', 3000, { label: 'Paycheque' }),
+    ]
+    expect(paydays(rows)).toEqual(['2026-08-27', '2026-09-10', '2026-09-24'])
   })
 })
 
-describe('savingsPlan with a daily target', () => {
-  // usual pace $50/day from the statements above; the target is $20/day
+describe('savingsPlan with a goal per pay', () => {
+  // paid today (Thursday) and in two weeks; everyday spending of $30/day; 200 already moved this pay
   const rows = [
-    bank('2026-08-21', -100), bank('2026-08-25', -200), bank('2026-08-30', -200), bank('2026-09-01', -500),
-    bank('2026-09-05', -350), bank('2026-09-10', -1, 'matched'), txn('2026-09-12', -500),
+    bank('2026-08-21', -210), bank('2026-08-28', -210), bank('2026-09-04', -210),
+    bank('2026-09-03', -500, 'transfer'),                       // last pay's savings
+    bank('2026-09-10', 2000, 'bank', 'DÉPÔT DE PAIE'),
+    bank('2026-09-10', -200, 'transfer'),                       // this pay's savings
+    txn('2026-09-15', -900),
+    txn('2026-09-24', -300),                                    // payday bill: goes out before the pay lands
+    txn('2026-09-24', 2000, { label: 'Paye' }),
+    txn('2026-09-25', 1500, { label: 'Paye' }),
   ]
-  const plan = savingsPlan(rows, daysUpTo('2026-09-10', 3000), TODAY, { horizonDays: 7, buffer: 1000, dailyTarget: 20 })
+  const goal = { payGoal: 1500, buffer: 500 }
 
-  it('reserves the target, so spending less frees money now', () => {
-    expect(plan.everyday).toMatchObject({ perDay: 20, source: 'target' })
-    expect(plan.usual?.perDay).toBe(50)
-    expect(plan.low).toBe(2360)
-    expect(plan.setAside).toBe(1360)
+  it('runs to the next payday, without the paycheque that closes it', () => {
+    const plan = savingsPlan(rows, daysUpTo('2026-09-10', 4000), TODAY, goal)
+    expect(plan.lastPay).toBe('2026-09-10')
+    expect(plan.nextPay).toBe('2026-09-24')
+    expect(plan.horizonDays).toBe(14)
+    expect(plan.upcomingIn).toBe(0)
+    expect(plan.upcomingOut).toBe(-1200)
   })
 
-  it('shows where the usual pace would leave the account once that money has moved', () => {
-    // 3000 − 7 × 50 − 500 = 2150 at the usual pace, minus the 1360 moved out
-    expect(plan.usualLow).toBe(790)
-    expect(plan.usualLowDate).toBe('2026-09-17')
+  it('asks for what is left of the goal and tells what that leaves to spend', () => {
+    const plan = savingsPlan(rows, daysUpTo('2026-09-10', 4000), TODAY, goal)
+    expect(plan.moved).toBe(200)
+    expect(plan.setAside).toBe(1300)
+    expect(plan.goalGap).toBe(0)
+    // 2700 after the move, 1200 of bills: 71/day keeps 500 on payday
+    expect(plan.allowance).toEqual({ perDay: 71, floor: 'cushion' })
+    // at the usual $30/day: 2700 − 14 × 30 − 1200
+    expect(plan.low).toBe(1080)
+    expect(plan.lowDate).toBe('2026-09-24')
   })
 
-  it('has nothing to compare without a target', () => {
-    const usual = savingsPlan(rows, daysUpTo('2026-09-10', 3000), TODAY, { horizonDays: 7, buffer: 1000 })
-    expect(usual.everyday?.source).toBe('statements')
-    expect(usual.usualLow).toBe(null)
-    expect(usual.setAside).toBe(1150)
+  it('counts what "I moved it" recorded, and a transfer back against it', () => {
+    const moved = [...rows, txn('2026-09-10', -1300, { label: 'Épargne' })]
+    expect(savingsPlan(moved, daysUpTo('2026-09-10', 2700), TODAY, goal)).toMatchObject({ moved: 1500, setAside: 0, goalGap: 0 })
+    const back = [...rows, bank('2026-09-10', 100, 'transfer')]
+    expect(savingsPlan(back, daysUpTo('2026-09-10', 4100), TODAY, goal).setAside).toBe(1400)
+  })
+
+  it('dips into the cushion for the goal, and says how to stay above zero', () => {
+    const plan = savingsPlan(rows, daysUpTo('2026-09-10', 2900), TODAY, goal)
+    expect(plan.setAside).toBe(1300)
+    expect(plan.allowance).toEqual({ perDay: 28, floor: 'zero' })
+  })
+
+  it('keeps only what the bills before payday leave room for', () => {
+    const plan = savingsPlan(rows, daysUpTo('2026-09-10', 1500), TODAY, goal)
+    expect(plan.setAside).toBe(300)
+    expect(plan.goalGap).toBe(1000)
+    expect(plan.allowance).toEqual({ perDay: 0, floor: 'zero' })
+    expect(plan.low).toBe(-420)
   })
 })
 
 describe('savingsPlan with everyday spending', () => {
   // statement through Sep 7, three days before TODAY; $10 a day of everyday spending
-  const rows = [bank('2026-09-07', -20), txn('2026-09-12', -500), txn('2026-09-14', 1000)]
-  const plan = savingsPlan(rows, daysUpTo('2026-09-10', 1000), TODAY, { horizonDays: 7, buffer: 0, dailyTarget: 10 })
+  const rows = [bank('2026-08-25', -70), bank('2026-09-07', -70), txn('2026-09-12', -500), txn('2026-09-14', 1000)]
+  const plan = savingsPlan(rows, daysUpTo('2026-09-10', 1000), TODAY, { horizonDays: 7, buffer: 0 })
 
   it('takes out what was likely spent since the statement', () => {
+    expect(plan.everyday?.perDay).toBe(10)
     expect(plan.statementDate).toBe('2026-09-07')
     expect(plan.statementAge).toBe(3)
     expect(plan.spentSince).toBe(30)
@@ -233,10 +277,13 @@ describe('savingsPlan with everyday spending', () => {
 
   it('reserves everyday spending every day, before the day\'s income', () => {
     expect(plan.everydayAhead).toBe(70)
-    expect(plan.low).toBe(430)
-    expect(plan.lowDate).toBe('2026-09-14')
-    expect(plan.projected).toBe(1400)
+    // 1000 − 30 − 2 days − 500 − 2 days = 430 on the 14th, before the 1000 lands
     expect(plan.setAside).toBe(430)
+    expect(plan.low).toBe(0)
+    expect(plan.lowDate).toBe('2026-09-14')
+    expect(plan.projected).toBe(970)
+    // and what is left to spend is exactly that pace
+    expect(plan.allowance).toEqual({ perDay: 10, floor: 'cushion' })
   })
 })
 

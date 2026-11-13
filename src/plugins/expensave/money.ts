@@ -1,14 +1,28 @@
+import type { Translate } from '../../i18n'
 import { addDays, dayKey, monthGrid, startOfMonth } from '../../util'
+import en from './en.json'
+import fr from './fr.json'
 import type { BankImportStatus, BankPreview, DayMoney, Everyday, ExpensaveCalendar, ExpensaveSettings, MoneyDay, MoneyWeek, SavingsPlan, Transaction } from './types'
 
 // Sign convention is Expensave's: income is positive, spending negative.
 
+/** How far ahead to look when no payday is planned. */
 export const DEFAULT_HORIZON_DAYS = 14
 export const DEFAULT_CURRENCY = 'CAD'
 export const DEFAULT_IMPORT_EVERY_DAYS = 14
-/** Statement weeks the everyday-spending estimate looks back over; it needs at least two. */
-export const EVERYDAY_WEEKS = 6
+/** Statement weeks the everyday pace averages over: recent, so a quieter stretch shows up quickly. It needs two. */
+export const EVERYDAY_WEEKS = 3
 const MIN_EVERYDAY_WEEKS = 2
+/** A single unplanned payment this big is a one-off (a contractor, a gift, a big purchase): it says nothing about next week. */
+export const ONE_OFF_MIN = 400
+/** How far ahead the next payday is looked for; past it the window is `horizonDays`. */
+export const PAY_LOOKAHEAD_DAYS = 35
+/** Paycheques this few days apart (one Thursday, one Friday) make one payday. */
+const PAY_GROUP_DAYS = 3
+/** Income that reads like a paycheque: "Paye", "DÉPÔT DE PAIE", "Payroll", "Salaire", "Paycheque". */
+const PAY_RE = /\bpa(?:ie|ye)\b|payroll|salaire|salary|pay ?cheque|paycheck/i
+/** What the "I moved it" button names its row, in every language. */
+const SAVED_LABELS = new Set([en['money.savedLabel'], fr['money.savedLabel']].map((s) => s.toLowerCase()))
 const DAY_MS = 86_400_000
 
 const daysBetween = (from: string, to: string) =>
@@ -48,7 +62,7 @@ export function moneyRange(
   const grid = monthGrid(startOfMonth(monthCursor))
   const week = startOfWeek(today)
   const starts = [grid[0], addDays(week, -7 * weeksBack)]
-  const ends = [grid[41], addDays(week, 7 * weeksAhead + 6), addDays(today, horizonDays)]
+  const ends = [grid[41], addDays(week, 7 * weeksAhead + 6), addDays(today, Math.max(horizonDays, PAY_LOOKAHEAD_DAYS))]
   return {
     start: dayKey(new Date(Math.min(...starts.map((d) => d.getTime())))),
     end: dayKey(new Date(Math.max(...ends.map((d) => d.getTime())))),
@@ -76,11 +90,6 @@ export function groupByDay(transactions: Transaction[]): Map<string, DayMoney> {
 
 const round2 = (v: number) => Math.round(v * 100) / 100
 const sum = (list: number[]) => round2(list.reduce((a, b) => a + b, 0))
-const median = (list: number[]) => {
-  const sorted = [...list].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
-}
 const fromBank = (t: Transaction) => t.kind === 'bank' || t.kind === 'matched' || t.kind === 'transfer'
 
 /** Last day the imported bank statements cover, or null before the first import. */
@@ -89,12 +98,14 @@ export function statementDate(transactions: Transaction[]): string | null {
 }
 
 const unplannedOut = (transactions: Transaction[], from: string, to: string) =>
-  -sum(transactions.filter((t) => t.kind === 'bank' && t.amount < 0 && t.date >= from && t.date <= to).map((t) => t.amount))
+  -sum(transactions
+    .filter((t) => t.kind === 'bank' && t.amount < 0 && t.amount > -ONE_OFF_MIN && t.date >= from && t.date <= to)
+    .map((t) => t.amount))
 
 /**
- * Usual everyday spending: what left the account that no plan entry announced — purchases, Interac transfers to
- * people, cash — but not moves between your own accounts. The median of the last full statement weeks, so one big
- * purchase doesn't swing it.
+ * Recent everyday spending: what left the account that no plan entry announced — groceries, purchases, Interac
+ * transfers to people, cash — but not moves between your own accounts, nor one-offs of ONE_OFF_MIN or more.
+ * The average of the last full statement weeks, so a quieter stretch lowers it within a few weeks.
  */
 export function everydaySpending(transactions: Transaction[]): Everyday | null {
   const through = statementDate(transactions)
@@ -110,17 +121,36 @@ export function everydaySpending(transactions: Transaction[]): Everyday | null {
     weeks.push(unplannedOut(transactions, start, last))
   }
   if (weeks.length < MIN_EVERYDAY_WEEKS) return null
-  const perWeek = round2(median(weeks))
-  return { perDay: round2(perWeek / 7), perWeek, weeks: weeks.length, source: 'statements' }
+  const perWeek = round2(sum(weeks) / weeks.length)
+  return { perDay: round2(perWeek / 7), perWeek, weeks: weeks.length }
 }
 
-/** Everyday spending per day over the last `days` the statements cover — how the target is holding. */
-export function recentSpending(transactions: Transaction[], days: number): number | null {
-  const through = statementDate(transactions)
-  if (!through) return null
-  const from = dayKey(addDays(new Date(`${through}T00:00:00`), 1 - days))
-  if (!transactions.some((t) => fromBank(t) && t.date <= from)) return null
-  return round2(unplannedOut(transactions, from, through) / days)
+const isPay = (t: Transaction) => t.amount > 0 && PAY_RE.test(`${t.label} ${t.description ?? ''}`)
+
+/** First day of every payday in the window, oldest first; paycheques a day or two apart count once. */
+export function paydays(transactions: Transaction[]): string[] {
+  const dates = [...new Set(transactions.filter(isPay).map((t) => t.date))].sort()
+  return dates.filter((d, i) => i === 0 || daysBetween(dates[i - 1], d) > PAY_GROUP_DAYS)
+}
+
+/** Money moved to your own accounts (a transfer back counts against it), and rows "I moved it" recorded. */
+const isSavingsMove = (t: Transaction) =>
+  t.kind === 'transfer' || ((t.kind === 'plan' || t.kind === 'matched') && SAVED_LABELS.has(t.label.trim().toLowerCase()))
+
+/**
+ * Most everyday spending per day, in whole dollars, that keeps the balance at or above `floor` on every day of the
+ * window — the days since the statement included. Null when there is no day to spread it over.
+ */
+function maxPerDay(start: number, byDay: Map<string, number[]>, age: number, today: Date, horizonDays: number, floor: number) {
+  let best = age > 0 ? (start - floor) / age : Infinity
+  let running = start
+  for (let i = 1; i <= horizonDays; i++) {
+    const amounts = byDay.get(dayKey(addDays(today, i))) ?? []
+    // the day's bills go out before its income comes in
+    best = Math.min(best, (running + sum(amounts.filter((a) => a < 0)) - floor) / (age + i))
+    running += sum(amounts)
+  }
+  return Number.isFinite(best) ? Math.floor(best) : null
 }
 
 /** Walks the balance day by day to the horizon; a day's spending and bills go out before its income comes in. */
@@ -173,10 +203,15 @@ export function weeklyMoney(
 }
 
 /**
- * How much can move to savings now: the lowest the balance gets before the horizon, minus the buffer.
- * The low point, not the end balance, because money arriving after payday can't pay rent due before it.
- * Everyday spending is taken out day by day, including the days since the last statement — at the daily target
- * when one is set (spend less, set more aside), else at the usual pace.
+ * What to move to savings now, and what that leaves for everyday spending until the next payday.
+ *
+ * With a goal per pay, the goal comes first: what is left of it once this pay's moves are counted, as long as the
+ * bills before payday leave room for it. The cushion is advice: the daily allowance keeps it when it can, and the
+ * recent pace shows where the account would bottom out. Without a goal, it's the most that keeps the cushion.
+ *
+ * The window ends on the next payday (its bills go out first, its paycheque closes the window), or after
+ * `horizonDays` when none is planned. The low point matters, not the end balance: money arriving after payday
+ * can't pay rent due before it.
  */
 export function savingsPlan(
   transactions: Transaction[],
@@ -184,66 +219,79 @@ export function savingsPlan(
   today: Date,
   cfg?: ExpensaveSettings,
 ): SavingsPlan {
-  const horizonDays = cfg?.horizonDays ?? DEFAULT_HORIZON_DAYS
   const buffer = cfg?.buffer ?? 0
+  const goal = cfg?.payGoal && cfg.payGoal > 0 ? cfg.payGoal : null
   const todayKey = dayKey(today)
-  const horizonEnd = dayKey(addDays(today, horizonDays))
+
+  const pays = paydays(transactions)
+  const lastPay = pays.filter((d) => d <= todayKey).at(-1) ?? null
+  const nextPay = pays.find((d) => d > todayKey && daysBetween(todayKey, d) <= PAY_LOOKAHEAD_DAYS) ?? null
+  const horizonEnd = nextPay ?? dayKey(addDays(today, cfg?.horizonDays ?? DEFAULT_HORIZON_DAYS))
+  const horizonDays = daysBetween(todayKey, horizonEnd)
+  const periodStart = lastPay ?? dayKey(addDays(today, -(cfg?.horizonDays ?? DEFAULT_HORIZON_DAYS)))
 
   const cleared = [...days].reverse().find((d) => d.date <= todayKey)
   const balance = round2(cleared?.balance ?? 0)
 
   const unclearedRows = transactions.filter((t) => t.date <= todayKey && !t.confirmed)
   const commitments = transactions
-    .filter((t) => t.date > todayKey && t.date <= horizonEnd)
+    .filter((t) => t.date > todayKey && t.date <= horizonEnd && !(t.date === nextPay && isPay(t)))
     .sort((a, b) => a.date.localeCompare(b.date) || a.amount - b.amount)
 
   const uncleared = sum(unclearedRows.map((t) => t.amount))
   const upcomingIn = sum(commitments.filter((t) => t.amount > 0).map((t) => t.amount))
   const upcomingOut = sum(commitments.filter((t) => t.amount < 0).map((t) => t.amount))
 
-  const usual = everydaySpending(transactions)
-  const target = cfg?.dailyTarget
-  const everyday: Everyday | null = target != null
-    ? { perDay: target, perWeek: round2(target * 7), weeks: 0, source: 'target' }
-    : usual
-  const perDay = everyday?.perDay ?? 0
+  const everyday = everydaySpending(transactions)
+  const pace = everyday?.perDay ?? 0
   const statement = statementDate(transactions)
   const statementAge = statement ? Math.max(0, daysBetween(statement, todayKey)) : null
-  const spentSince = round2(perDay * (statementAge ?? 0))
+  const age = statementAge ?? 0
 
   const byDay = new Map<string, number[]>()
   for (const t of commitments) byDay.set(t.date, [...(byDay.get(t.date) ?? []), t.amount])
-  const startAt = (pace: number) => round2(balance + uncleared - pace * (statementAge ?? 0))
+  const start = round2(balance + uncleared)
+  /** The window at `perDay` of everyday spending, once `out` has moved to savings today. */
+  const at = (perDay: number, out: number) => walk(round2(start - perDay * age - out), byDay, perDay, today, horizonDays)
 
-  const { low, lowDate, end: projected } = walk(startAt(perDay), byDay, perDay, today, horizonDays)
-  const available = round2(low - buffer)
-  const setAside = Math.max(0, available)
-  // the target is a promise: show where the usual pace would leave the account once the money has moved
-  const atUsual = target != null && usual ? walk(startAt(usual.perDay), byDay, usual.perDay, today, horizonDays) : null
+  const moved = round2(-sum(transactions.filter((t) => isSavingsMove(t) && t.date >= periodStart && t.date <= todayKey).map((t) => t.amount)))
+  const remaining = goal == null ? 0 : Math.max(0, round2(goal - Math.max(0, moved)))
+  // the most the bills before payday leave room for, if nothing else were spent
+  const room = Math.max(0, at(0, 0).low)
+  const setAside = goal == null ? Math.max(0, round2(at(pace, 0).low - buffer)) : Math.min(remaining, room)
+
+  const { low, lowDate, end: projected } = at(pace, setAside)
+  const keepCushion = maxPerDay(start - setAside, byDay, age, today, horizonDays, buffer)
+  const allowance = keepCushion == null ? null
+    : keepCushion >= 0 || buffer <= 0 ? { perDay: Math.max(0, keepCushion), floor: 'cushion' as const }
+    : { perDay: Math.max(0, maxPerDay(start - setAside, byDay, age, today, horizonDays, 0) ?? 0), floor: 'zero' as const }
 
   return {
     balance,
     statementDate: statement,
     statementAge,
     everyday,
-    usual,
-    usualLow: atUsual ? round2(atUsual.low - setAside) : null,
-    usualLowDate: atUsual?.lowDate ?? null,
-    spentSince,
-    everydayAhead: round2(perDay * horizonDays),
+    spentSince: round2(pace * age),
+    everydayAhead: round2(pace * horizonDays),
     uncleared,
+    unclearedCount: unclearedRows.length,
     upcomingIn,
     upcomingOut,
+    commitments,
+    periodStart,
+    lastPay,
+    nextPay,
+    horizonDays,
+    horizonEnd,
+    buffer,
+    goal,
+    moved,
+    setAside,
+    goalGap: goal == null ? 0 : round2(remaining - setAside),
+    allowance,
     low,
     lowDate,
     projected,
-    buffer,
-    horizonDays,
-    horizonEnd,
-    setAside,
-    shortfall: available < 0 ? round2(-available) : 0,
-    commitments,
-    unclearedCount: unclearedRows.length,
   }
 }
 
@@ -252,6 +300,15 @@ export function statementForecast(preview: Pick<BankPreview, 'balanceFrom' | 'pl
   if (!preview.balanceFrom || preview.plannedSince == null) return null
   return round2(preview.balanceFrom.balance + preview.plannedSince - perDay * daysBetween(preview.balanceFrom.date, preview.to))
 }
+
+const shortDate = (day: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(`${day}T00:00:00`))
+
+/** "until payday, Thu Nov 26", or until the window's last day when no payday is planned. */
+export const untilLabel = (plan: Pick<SavingsPlan, 'nextPay' | 'horizonEnd'>, locale: string, t: Translate) =>
+  plan.nextPay
+    ? t('money.untilPay', { date: shortDate(plan.nextPay, locale) })
+    : t('money.untilDate', { date: shortDate(plan.horizonEnd, locale) })
 
 /** "1 234,56", "1,234.56", "$1234.5" → 1234.56; null when it is not a number. */
 export function parseAmount(text: string): number | null {

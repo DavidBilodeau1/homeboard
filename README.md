@@ -121,17 +121,32 @@ renews its token) or a `FRIGATE_TOKEN`. The browser only reaches Frigate through
 an allow-list of media paths, with camera names checked against Frigate.
 
 **Money (Expensave).** Each Expensave calendar becomes a calendar layer. The
-Money page shows what is *safe to set aside*: today's cleared balance, minus
-charges not cleared yet, walked day by day through everything scheduled until
-the horizon. The answer is the **lowest** point along the way minus your buffer,
-since a paycheque that lands after rent cannot pay it. Everyday spending (bank
-rows no plan entry announced, transfers between your own accounts excluded) is
-reserved for every day too, including the days since the last statement: your
-usual pace (the median week of the last six), or a daily spending target set on
-the card or in Settings. A target lowers the reserve, so you can set more aside
-now; the card then shows your usual and recent pace and warns where the usual
-pace would take the account. "I moved it to savings" records a transfer at once,
-so the amount drops before the bank shows it.
+Money page answers two questions each payday: how much to move to savings now,
+and how much that leaves to spend each day until the next payday.
+
+It starts from today's cleared balance, minus charges not cleared yet, and walks
+day by day through everything scheduled until the next payday (entries named
+"Paye", "Paie", "Payroll", "Salary" or "Paycheque"; a Thursday and a Friday
+cheque count as one payday). The paycheque that ends the window comes after that
+day's bills. With no payday planned, the window is the horizon. What counts is
+the **lowest** point along the way, since a paycheque that lands after rent
+cannot pay it.
+
+With a **savings goal per pay**, the goal comes first. Transfers to your own
+accounts since the last payday count toward it, and so does "I moved it to
+savings", which records a transfer at once so the amount drops before the bank
+shows it. The card asks for what is left of the goal, as far as the bills before
+payday allow. It then gives a daily spending allowance that keeps your
+**cushion**, or that just stays above zero when the goal dips into the cushion.
+Without a goal, the amount is the most you can move and still keep the cushion.
+
+Everyday spending is what left the account that no plan entry announced, at
+your recent pace: the average of the last three statement weeks. Transfers
+between your own accounts and one-off payments of $400 or more are left out.
+The card shows where that pace would take the account. It is also reserved for
+the days since the last statement. Budget-style plan entries (a weekly
+"Groceries" amount) would count that spending twice, so leave them out of the
+plan.
 
 The *Bank statement* card takes a CSV export (date, description, and amount or
 withdrawal/deposit columns), shows what it would change, and on confirmation

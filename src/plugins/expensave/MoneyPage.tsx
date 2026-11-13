@@ -6,7 +6,7 @@ import { dayKey } from '../../util'
 import { usePluginSettings } from '../settings'
 import { recordSetAside } from './api'
 import { BankImport } from './BankImport'
-import { calendarColor, calendarName, DEFAULT_IMPORT_EVERY_DAYS, fmtMoney, fmtWeekRange, parseAmount, recentSpending } from './money'
+import { calendarColor, calendarName, DEFAULT_IMPORT_EVERY_DAYS, fmtMoney, fmtWeekRange, ONE_OFF_MIN, parseAmount, untilLabel } from './money'
 import { useMoney } from './MoneyProvider'
 import type { ExpensaveSettings, MoneyState, MoneyWeek, SavingsPlan, Transaction } from './types'
 
@@ -71,6 +71,7 @@ function typicalWeek(weeks: MoneyWeek[]): number | null {
 function Breakdown({ plan, currency }: { plan: SavingsPlan; currency: string }) {
   const { locale, t } = useStore()
   const money = (v: number) => fmtMoney(v, locale, currency)
+  const until = untilLabel(plan, locale, t)
   return (
     <div className="mny-breakdown">
       <div><span>{t('money.balanceNow')}</span><b>{money(plan.balance)}</b></div>
@@ -83,42 +84,79 @@ function Breakdown({ plan, currency }: { plan: SavingsPlan; currency: string }) 
       {plan.uncleared !== 0 && (
         <div><span>{t('money.uncleared', { count: plan.unclearedCount })}</span><b className="out">{money(plan.uncleared)}</b></div>
       )}
-      {plan.upcomingIn !== 0 && <div><span>{t('money.incomingSoon')}</span><b className="in">+{money(plan.upcomingIn)}</b></div>}
-      {plan.upcomingOut !== 0 && <div><span>{t('money.billsSoon')}</span><b className="out">{money(plan.upcomingOut)}</b></div>}
+      {plan.upcomingIn !== 0 && <div><span>{t('money.incomingSoon', { until })}</span><b className="in">+{money(plan.upcomingIn)}</b></div>}
+      {plan.upcomingOut !== 0 && <div><span>{t('money.billsSoon', { until })}</span><b className="out">{money(plan.upcomingOut)}</b></div>}
       {plan.everyday && plan.everydayAhead !== 0 && (
         <div>
-          <span>{t(plan.everyday.source === 'target' ? 'money.everydayTarget' : 'money.everyday', {
-            perDay: fmtMoney(plan.everyday.perDay, locale, currency, false),
-          })}</span>
+          <span>{t('money.everyday', { perDay: fmtMoney(plan.everyday.perDay, locale, currency, false) })}</span>
           <b className="out">−{money(plan.everydayAhead)}</b>
         </div>
       )}
-      {plan.lowDate !== dayKey(new Date()) && (
+      {plan.setAside !== 0 && <div><span>{t('money.setAsideNow')}</span><b className="out">−{money(plan.setAside)}</b></div>}
+      <div className="mny-total">
+        <span>{plan.nextPay
+          ? t('money.beforePay', { date: dateLabel(plan.nextPay, locale) })
+          : t('money.projected', { date: dateLabel(plan.horizonEnd, locale) })}</span>
+        <b className={plan.projected < 0 ? 'out' : undefined}>{money(plan.projected)}</b>
+      </div>
+      {plan.low < plan.projected && (
         <div className="mny-low">
           <span>{t('money.lowestPoint', { date: dateLabel(plan.lowDate, locale) })}</span>
-          <b>{money(plan.low)}</b>
+          <b className={plan.low < 0 ? 'out' : undefined}>{money(plan.low)}</b>
         </div>
       )}
-      {plan.buffer !== 0 && <div><span>{t('money.buffer')}</span><b className="out">−{money(plan.buffer)}</b></div>}
-      <div className="mny-total">
-        <span>{t('money.projected', { date: dateLabel(plan.horizonEnd, locale) })}</span>
-        <b>{money(plan.projected)}</b>
-      </div>
+      {plan.everyday && (
+        <p className="mny-basis">{t('money.everydayBasis', { weeks: plan.everyday.weeks, min: fmtMoney(ONE_OFF_MIN, locale, currency, false) })}</p>
+      )}
     </div>
   )
 }
 
-function WeeklyGoal({ goal, setAside, currency }: { goal: number; setAside: number; currency: string }) {
+/** Under the amount: the goal and how this pay is going, or what the amount means without a goal. */
+function GoalLine({ plan, currency }: { plan: SavingsPlan; currency: string }) {
   const { locale, t } = useStore()
+  const money = (v: number) => fmtMoney(v, locale, currency, false)
+  const since = dateLabel(plan.periodStart, locale)
+  if (plan.goal == null) {
+    return <p className="mny-hero-sub">{t('money.setAsideHint', { buffer: money(plan.buffer), until: untilLabel(plan, locale, t) })}</p>
+  }
+  if (plan.setAside === 0 && plan.goalGap === 0) {
+    return <p className="mny-hero-sub mny-goal-done">{t('money.goalDone', { moved: money(plan.moved), date: since })}</p>
+  }
   return (
-    <div className="mny-goal">
-      <div className="mny-goal-head">
-        <span>{t('money.goal')}</span>
-        <b>{fmtMoney(Math.min(setAside, goal), locale, currency, false)} / {fmtMoney(goal, locale, currency, false)}</b>
-      </div>
-      <div className="mny-goal-bar">
-        <span style={{ width: `${Math.min(100, (setAside / goal) * 100)}%` }} />
-      </div>
+    <p className="mny-hero-sub">
+      {plan.moved > 0
+        ? t('money.goalProgress', { goal: money(plan.goal), moved: money(plan.moved), date: since })
+        : t('money.goalHint', { goal: money(plan.goal) })}
+      {plan.goalGap > 0 && <> <b className="out">{t('money.goalGap', { gap: money(plan.goalGap), until: untilLabel(plan, locale, t) })}</b></>}
+    </p>
+  )
+}
+
+/** What's left to spend each day once the money has moved, and where the recent pace would take the account. */
+function Allowance({ plan, currency }: { plan: SavingsPlan; currency: string }) {
+  const { locale, t } = useStore()
+  const money = (v: number) => fmtMoney(v, locale, currency, false)
+  const perDay = (v: number) => t('money.perDay', { amount: money(v) })
+  const until = untilLabel(plan, locale, t)
+  const { allowance, everyday } = plan
+  const tone = plan.low < 0 ? 'bad' : plan.low < plan.buffer ? 'warn' : 'ok'
+  return (
+    <div className="mny-allowance">
+      {allowance && (
+        <p>
+          {allowance.floor === 'zero'
+            ? t('money.allowanceDip', { perDay: perDay(allowance.perDay), until, buffer: money(plan.buffer) })
+            : plan.buffer > 0
+              ? t('money.allowanceCushion', { perDay: perDay(allowance.perDay), until, buffer: money(plan.buffer) })
+              : t('money.allowance', { perDay: perDay(allowance.perDay), until })}
+        </p>
+      )}
+      {everyday && (
+        <p className={`mny-pace ${tone}`}>
+          {t('money.paceLow', { perDay: perDay(everyday.perDay), low: money(plan.low), date: dateLabel(plan.lowDate, locale) })}
+        </p>
+      )}
     </div>
   )
 }
@@ -183,92 +221,24 @@ function MovedIt({ suggested, calendar }: { suggested: number; calendar: number 
   )
 }
 
-const TARGET_STEP = 10
-
-/** Daily spending target: lower it to set more aside now; the amount then assumes you keep to it. */
-function DailyTarget({ money, settings, recentDays }: { money: MoneyState; settings: ExpensaveSettings; recentDays: number }) {
-  const { locale, savePluginSettings, t } = useStore()
-  const { plan, currency } = money
-  const perDay = (v: number) => t('money.perDay', { amount: fmtMoney(v, locale, currency, false) })
-  const target = settings.dailyTarget
-  const usual = plan.usual?.perDay
-  const recent = useMemo(() => recentSpending(money.transactions, recentDays), [money.transactions, recentDays])
-  const save = (dailyTarget: number | undefined) => {
-    const next: ExpensaveSettings = { ...settings, dailyTarget }
-    return savePluginSettings('expensave', next)
-  }
-
-  if (target == null) {
-    if (!money.canWrite || usual == null) return null
-    return (
-      <button className="dash-cancel mny-target-set" onClick={() => save(Math.floor(usual / TARGET_STEP) * TARGET_STEP)}>
-        {t('money.setTarget')}
-      </button>
-    )
-  }
-  return (
-    <div className="mny-target">
-      <div className="mny-target-row">
-        <span>{t('money.target')}</span>
-        {money.canWrite && (
-          <button className="mny-step" aria-label="−" disabled={target <= 0} onClick={() => save(Math.max(0, target - TARGET_STEP))}>−</button>
-        )}
-        <b>{perDay(target)}</b>
-        {money.canWrite && <button className="mny-step" aria-label="+" onClick={() => save(target + TARGET_STEP)}>+</button>}
-        {money.canWrite && <button className="mny-target-clear" onClick={() => save(undefined)}>{t('money.clearTarget')}</button>}
-      </div>
-      <p>
-        {usual != null && t('money.usualPace', { perDay: perDay(usual) })}
-        {recent != null && (
-          <> · <span className={recent > target ? 'out' : 'in'}>{t('money.recentPace', { days: recentDays, perDay: perDay(recent) })}</span></>
-        )}
-      </p>
-    </div>
-  )
-}
-
-/** With a target, what happens if the money moves but spending stays as usual. */
-function UsualPaceWarning({ plan, currency }: { plan: SavingsPlan; currency: string }) {
-  const { locale, t } = useStore()
-  if (plan.usualLow == null || !plan.usual || !plan.usualLowDate || plan.usualLow >= plan.buffer) return null
-  return (
-    <p className="bank-warn mny-usual-warn">
-      {t('money.usualWarning', {
-        perDay: t('money.perDay', { amount: fmtMoney(plan.usual.perDay, locale, currency, false) }),
-        low: fmtMoney(plan.usualLow, locale, currency, false),
-        date: dateLabel(plan.usualLowDate, locale),
-      })}
-    </p>
-  )
-}
-
 function SetAsideCard({ money, settings }: { money: MoneyState; settings: ExpensaveSettings }) {
   const { locale, t } = useStore()
   const { plan, currency } = money
   const typical = useMemo(() => typicalWeek(money.weeks), [money.weeks])
   const every = settings.importEveryDays ?? DEFAULT_IMPORT_EVERY_DAYS
   const late = plan.statementAge != null && plan.statementAge > every
-  const targeted = plan.everyday?.source === 'target'
   const calendar = settings.calendars?.[0]?.id ?? money.calendars[0]?.id
-  const weeklyGoal = settings.weeklyGoal
   return (
     <section className="card mny-hero">
       <h2 className="card-title"><MoneyIcon size={20} /> {t('money.setAside')}</h2>
-      <div className={`mny-hero-value${plan.shortfall ? ' short' : ''}${late ? ' stale' : ''}`}>
-        {fmtMoney(plan.shortfall ? -plan.shortfall : plan.setAside, locale, currency)}
+      <div className={`mny-hero-value${plan.low < 0 ? ' short' : ''}${late ? ' stale' : ''}`}>
+        {fmtMoney(plan.setAside, locale, currency)}
       </div>
-      <p className="mny-hero-sub">
-        {t(plan.shortfall ? 'money.shortfallHint' : targeted ? 'money.setAsideTargetHint' : 'money.setAsideHint', {
-          days: plan.horizonDays,
-          perDay: t('money.perDay', { amount: fmtMoney(plan.everyday?.perDay ?? 0, locale, currency, false) }),
-        })}
-      </p>
+      <GoalLine plan={plan} currency={currency} />
       <StatementAge plan={plan} late={late} />
-      <DailyTarget money={money} settings={settings} recentDays={every} />
+      <Allowance plan={plan} currency={currency} />
       <Breakdown plan={plan} currency={currency} />
-      <UsualPaceWarning plan={plan} currency={currency} />
       {money.canWrite && calendar != null && plan.setAside > 0 && <MovedIt suggested={plan.setAside} calendar={calendar} />}
-      {!!weeklyGoal && weeklyGoal > 0 && <WeeklyGoal goal={weeklyGoal} setAside={plan.setAside} currency={currency} />}
       {typical != null && (
         <p className="mny-typical">
           {t('money.typicalWeek')} <b className={typical >= 0 ? 'in' : 'out'}>
@@ -309,7 +279,7 @@ function UpcomingCard({ money }: { money: MoneyState }) {
   const lateUncleared = money.transactions.filter((tx) => !tx.confirmed && tx.date <= todayKey)
   return (
     <section className="card mny-upcoming">
-      <h2 className="card-title">{t('money.upcoming', { days: plan.horizonDays })}</h2>
+      <h2 className="card-title">{t('money.upcoming', { until: untilLabel(plan, locale, t) })}</h2>
       <div className="mny-txn-list">
         {lateUncleared.map((tx) => <TxnRow key={`u${tx.id}`} txn={tx} locale={locale} currency={currency} />)}
         {plan.commitments.map((tx) => <TxnRow key={tx.id} txn={tx} locale={locale} currency={currency} />)}

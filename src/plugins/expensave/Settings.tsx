@@ -57,13 +57,11 @@ export function ExpensaveSettingsPanel({ settings, onChange }: SettingsPanelProp
       </Field>
       <NumberField label={t('money.settings.horizon')} min={1} max={180} value={settings.horizonDays} fallback={DEFAULT_HORIZON_DAYS}
         onChange={(horizonDays) => set({ horizonDays })} />
+      <NumberField label={t('money.settings.goal')} min={0} step={50} value={settings.payGoal}
+        onChange={(payGoal) => set({ payGoal })} />
       <NumberField label={t('money.settings.buffer')} min={0} step={50} value={settings.buffer} fallback={0}
         onChange={(buffer) => set({ buffer })} />
-      <NumberField label={t('money.settings.goal')} min={0} step={25} value={settings.weeklyGoal}
-        onChange={(weeklyGoal) => set({ weeklyGoal })} />
-      <NumberField label={t('money.settings.target')} min={0} step={10} value={settings.dailyTarget}
-        onChange={(dailyTarget) => set({ dailyTarget })} />
-      <Note>{t('money.settings.targetHint')}</Note>
+      <Note>{t('money.settings.goalHint')}</Note>
       <NumberField label={t('money.settings.importEvery')} min={1} max={90} value={settings.importEveryDays} fallback={DEFAULT_IMPORT_EVERY_DAYS}
         onChange={(importEveryDays) => set({ importEveryDays })} />
       <Field label={t('money.settings.show')}>
