@@ -3,7 +3,7 @@ import { MoneyIcon } from '../../icons'
 import { navigate } from '../../navigation'
 import { useStore } from '../../store'
 import type { TileProps } from '../types'
-import { fmtMoney } from './money'
+import { fmtMoney, untilLabel } from './money'
 import { useMoney } from './MoneyProvider'
 
 /** The set-aside number and how this week is going. */
@@ -29,10 +29,17 @@ export function MoneyTile({ editing }: TileProps) {
       <h2 className="card-title"><MoneyIcon size={18} /> {t('nav.money')}</h2>
       <div className="mny-card-body">
         <span className="mny-card-label">{t('money.setAside')}</span>
-        <span className={`mny-card-value${plan.shortfall ? ' short' : ''}`}>
-          {fmtMoney(plan.shortfall ? -plan.shortfall : plan.setAside, locale, currency, false)}
+        <span className={`mny-card-value${plan.low < 0 ? ' short' : ''}`}>
+          {fmtMoney(plan.setAside, locale, currency, false)}
         </span>
-        <span className="mny-card-sub">{t('money.throughDays', { days: plan.horizonDays })}</span>
+        <span className="mny-card-sub">
+          {plan.goal != null && plan.setAside === 0 && plan.goalGap === 0
+            ? t('money.tileDone')
+            : plan.allowance && t('money.tileAllowance', {
+              perDay: t('money.perDay', { amount: fmtMoney(plan.allowance.perDay, locale, currency, false) }),
+              until: untilLabel(plan, locale, t),
+            })}
+        </span>
       </div>
       {week && (
         <div className="mny-card-week">

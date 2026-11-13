@@ -13,18 +13,16 @@ export interface ExpensaveSettings extends PluginSettings {
   calendars?: ExpensaveCalendarCfg[]
   /** ISO 4217 code used to format amounts */
   currency?: string
-  /** how far ahead to count already-scheduled money (default 14 days) */
+  /** how far ahead to look when no payday is planned (default 14 days); with one, the window ends on payday */
   horizonDays?: number
-  /** cash that must stay in the account and is never set aside */
+  /** cash you'd like to keep in the account: the daily allowance keeps it, but a savings goal may dip into it */
   buffer?: number
-  /** optional weekly savings target, shown as progress on the Money page */
-  weeklyGoal?: number
+  /** savings to move each pay period; moves to your own accounts since payday count toward it */
+  payGoal?: number
   /** show the transactions layer on the calendar by default (default true) */
   showInCalendar?: boolean
   /** how often a bank statement should be imported on the Money page (default 14 days) */
   importEveryDays?: number
-  /** everyday spending to reserve per day; omit to reserve your usual pace from the bank statements */
-  dailyTarget?: number
 }
 
 /** One bank statement line, as the import preview shows it. */
@@ -194,48 +192,59 @@ export interface MoneyWeek {
   future: boolean
 }
 
-/** Everyday spending per day: your usual pace (see everydaySpending() in money.ts) or your target. */
+/** Recent everyday spending, from the bank statements (see everydaySpending() in money.ts). */
 export interface Everyday {
   perDay: number
   perWeek: number
-  /** statement weeks behind the estimate; 0 for a target */
+  /** statement weeks behind the average */
   weeks: number
-  source: 'statements' | 'target'
 }
 
-/** What can safely move to savings today; see savingsPlan() in money.ts. */
+/** What to move to savings now and what that leaves to spend; see savingsPlan() in money.ts. */
 export interface SavingsPlan {
   balance: number
   /** last day the bank statements cover; null before the first import */
   statementDate: string | null
   /** days from `statementDate` to today */
   statementAge: number | null
-  /** everyday spending reserved: the target when one is set, else the usual pace */
+  /** recent everyday pace; null until two statement weeks exist */
   everyday: Everyday | null
-  /** usual pace from the statements, whatever the target */
-  usual: Everyday | null
-  /** with a target: lowest point at the usual pace once `setAside` has moved out */
-  usualLow: number | null
-  usualLowDate: string | null
   /** everyday spending since the statement: gone from the account, not in the ledger yet */
   spentSince: number
-  /** everyday spending reserved over the horizon */
+  /** everyday spending at the recent pace over the window */
   everydayAhead: number
   uncleared: number
+  unclearedCount: number
+  /** money in and out between tomorrow and the end of the window, not counting the paycheque that closes it */
   upcomingIn: number
   upcomingOut: number
-  /** lowest the account gets between today and the horizon — the real limit */
-  low: number
-  lowDate: string
-  /** balance once every commitment in the window has landed */
-  projected: number
-  buffer: number
+  commitments: Transaction[]
+  /** first day of this pay period: the last payday, or `horizonDays` ago when none shows */
+  periodStart: string
+  lastPay: string | null
+  /** next payday within PAY_LOOKAHEAD_DAYS; the window ends there */
+  nextPay: string | null
   horizonDays: number
   horizonEnd: string
+  buffer: number
+  /** savings goal per pay; null when none is set */
+  goal: number | null
+  /** moved to your own accounts since `periodStart`, net of what came back */
+  moved: number
+  /** what to move now: the rest of the goal, or without one the most that keeps the cushion */
   setAside: number
-  shortfall: number
-  commitments: Transaction[]
-  unclearedCount: number
+  /** part of the goal the bills before payday leave no room for */
+  goalGap: number
+  /**
+   * Most everyday spending per day once `setAside` has moved: keeping the cushion, or when that's out of reach
+   * (`floor: 'zero'`) staying above zero. Null when the window has no days.
+   */
+  allowance: { perDay: number; floor: 'cushion' | 'zero' } | null
+  /** lowest point at the recent pace once `setAside` has moved */
+  low: number
+  lowDate: string
+  /** balance at the end of the window, before the paycheque that closes it */
+  projected: number
 }
 
 export interface MoneyState {
